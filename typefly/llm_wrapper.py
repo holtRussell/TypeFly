@@ -1,14 +1,18 @@
+# hello world
 import os
+import requests
 from enum import Enum
-from openai import OpenAI
 
 class ModelType(Enum):
-    GPT4 = "gpt-4"
-    GPT4O = "gpt-4o"
-    GPT5 = "gpt-5"
+    LLAMA3_8B = "llama3:8b-10k"
+    LLAMA3 = "llama3"
+    LLAMA3_70B = "llama3:70b"
+    LLAMA3_1 = "llama3.1"
+    LLAMA3_2 = "llama3.2"
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 CHAT_LOG_FILE = os.path.join(CURRENT_DIR, "assets/chat_log.txt")
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 
 class LLMWrapper:
     """
@@ -16,29 +20,26 @@ class LLMWrapper:
     """
     def __init__(self, temperature: float=0.1):
         self.temperature = temperature
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY is not set. Please set it in the environment variable or in the .env file.")
-        
-        self.gpt_client = OpenAI(api_key=api_key)
+        self.ollama_url = OLLAMA_URL
 
     def request(self, prompt, model_type: ModelType | str) -> str:        
         """
         Request the LLM API with the prompt and model type.
         """
+        model_name = model_type.value if isinstance(model_type, ModelType) else model_type
 
-        if model_type in [ModelType.GPT4, ModelType.GPT4O, ModelType.GPT5]:
-            response = self.gpt_client.chat.completions.create(
-                model=model_type.value if isinstance(model_type, ModelType) else model_type,
-                messages=[{"role": "user", "content": prompt}],
-                stream=False,
-            )
-            ret = response.choices[0].message.content
-        # elif other models, implement here
-        else:
-            raise ValueError(f"Model type {model_type} not supported.")
+        payload = {
+            "model": model_name,
+            "prompt": prompt,
+            "temperature": self.temperature,
+            "stream": False
+        }
 
-        # log the prompt and response
+        response = requests.post(f"{self.ollama_url}/api/generate", json=payload)
+        response.raise_for_status()
+        
+        ret = response.json().get("response", "")
+
         with open(CHAT_LOG_FILE, "a") as f:
             f.write(prompt + "\n---\n")
             f.write(ret + "\n--------------------------------\n")

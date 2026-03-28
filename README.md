@@ -32,8 +32,9 @@ To control a Unitree Go2 robot dog with TypeFly, you need to install ROS2 and ru
 ### Other Robots
 To support other robots, you need to implement the robot control interface based on the `RobotWrapper`, see examples in `typefly/platforms/*`.
 
-## 3. OPENAI API KEY Requirement
-TypeFly use GPT API as the remote LLM planner, please make sure you have set the `OPENAI_API_KEY` environment variable.
+## 3. OLLAMA API Requirement
+
+TypeFly uses OLLAMA as the local LLM planner. By default, it connects to `http://localhost:11434`. You can configure the OLLAMA URL by setting the `OLLAMA_URL` environment variable.
 
 ## 4. Setup Vision Encoder
 ### Local Service

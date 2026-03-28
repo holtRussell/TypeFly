@@ -69,8 +69,10 @@ class LLMController():
             plan = self.planner.plan(user_instruction)
             print_t(f"[P] Plan: {plan}")
 
-            if plan.startswith('```json'):
-                plan = plan.split('```json')[1].split('```')[0]
+            # Strip markdown code blocks (```json, ```, etc.)
+            if plan.startswith('```'):
+                # Remove the code block markers
+                plan = plan.replace('```json', '').replace('```', '').strip()
             
             # parse the plan json
             try:

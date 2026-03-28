@@ -7,7 +7,7 @@ from .robot_wrapper import RobotWrapper
 from .robot_info import RobotInfo
 
 class LLMPlanner():
-    def __init__(self, robot: RobotWrapper, model_type: ModelType = ModelType.GPT4O):
+    def __init__(self, robot: RobotWrapper, model_type: ModelType = ModelType.LLAMA3_8B):
         self.llm = LLMWrapper()
         self.robot = robot
         self.model_type = model_type

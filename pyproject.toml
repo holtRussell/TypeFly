@@ -19,7 +19,7 @@ dependencies = [
     "gradio",
     "grpcio-tools",
     "aiohttp",
-    "openai",
+    "requests",
     "opencv-python",
     "numpy",
     "pillow",

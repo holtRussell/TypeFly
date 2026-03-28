@@ -7,12 +7,10 @@ Example 1
 Find a bottle, tell me it's height and take a picture of it.
 
 ## OUTPUT
-```json
 {
     "thoughts": "No bottle in the view, call scan to find one and do the rest of the tasks.",
     "plan": "if scan('bottle'):\n    goto('bottle')\n    height = object_height('bottle')\n    log(height)\n    take_picture()\nelse:\n    log('No bottle in the view')"
 }
-```
 
 ---
 Example 2
@@ -26,12 +24,10 @@ Example 2
 Find an apple.
 
 ## OUTPUT
-```json
 {
     "thoughts": "There is an apple in the view, just tell the user and go to the apple.",
     "plan": "log('I can already see an apple near the tv.')\ngoto('apple')"
 }
-```
 
 ---
 Example 3
