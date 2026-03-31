@@ -32,9 +32,16 @@ class RobotInfo:
     
     @classmethod
     def from_dict(cls, data: dict) -> 'RobotInfo':
-        return cls(data["robot_id"], data["robot_type"], data.get("extra"))
+        extra = data.get("extra", {})
+        if extra is None:
+            extra = {}
+        return cls(data["robot_id"], data["robot_type"], extra)
     
-    @classmethod
-    def from_json(cls, json_str: str) -> 'RobotInfo':
-        data = json.loads(json_str)
-        return cls.from_dict(data)
+    def get_yolo_enabled(self) -> bool:
+        return self.extra.get("yolo_enabled", False) if self.extra else False
+    
+    def get_scene_image_log(self) -> bool:
+        return self.extra.get("scene_image_log", False) if self.extra else False
+    
+    def get_debug_mode(self) -> bool:
+        return self.extra.get("debug_mode", False) if self.extra else False

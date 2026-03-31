@@ -13,7 +13,6 @@ class LLMPlanner():
         self.model_type = model_type
 
         assets_path = os.path.join(CURRENT_PROJ_DIR, f"./assets")
-        # read prompt from txt
         with open(os.path.join(assets_path, "prompt_plan.txt"), "r") as f:
             self.prompt_plan = f.read()
         with open(os.path.join(assets_path, "prompt_probe.txt"), "r") as f:
@@ -24,9 +23,6 @@ class LLMPlanner():
             self.example_plans = f.read()
 
     def plan(self, user_instruction: str, error_message: Optional[list[str]]=None, execution_history: Optional[list[str]]=None):
-        """
-        Plan the user instruction using the LLM
-        """
         prompt = self.prompt_plan.format(guidelines=self.guidelines,
                                          robot_skills=str(self.robot.skillset),
                                          example_plans=self.example_plans,
@@ -36,8 +32,5 @@ class LLMPlanner():
         return self.llm.request(prompt, self.model_type)
     
     def probe(self, query: str, robot_info: RobotInfo) -> str:
-        """
-        Probe the LLM for question $query based on the scene description
-        """
         prompt = self.prompt_probe.format(scene_description=self.robot.get_obj_list_str(), query=query)
         return self.llm.request(prompt, self.model_type)

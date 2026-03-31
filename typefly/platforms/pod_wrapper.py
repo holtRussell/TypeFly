@@ -8,7 +8,6 @@ from overrides import overrides
 from podtp import Podtp, sensor
 
 from ..robot_wrapper import RobotWrapper, RobotObservation
-from ..yolo_client import YoloClient
 from ..robot_info import RobotInfo
 from ..utils import undistort_image
 
@@ -29,12 +28,10 @@ class PodObservation(RobotObservation):
     def __init__(self, sensor: sensor.Sensor, robot_info: RobotInfo, rate: int = 10):
         super().__init__(robot_info, rate)
         self.sensor = sensor
-        self.yolo_client = YoloClient(robot_info)
 
         def _capture_spin():
             while self.running:
                 frame = sensor.frame
-                # Convert the frame to RGB and store it in self._image
                 if frame is not None:
                     undistorted_frame = undistort_image(frame, POD_CAM_K, POD_CAM_D)
                     self._image = Image.fromarray(undistorted_frame)
@@ -51,14 +48,11 @@ class PodObservation(RobotObservation):
 
     @overrides
     async def process_image(self, image: Image.Image):
-        await self.yolo_client.detect(image)
+        pass
     
     @overrides
     def fetch_processed_result(self) -> dict[str, Any]:
-        _, object_list = self.yolo_client.latest_result
-        return {
-            "yolo": object_list
-        }
+        return {}
 
 class PodWrapper(RobotWrapper):
     def __init__(self, robot_info: RobotInfo):
@@ -69,7 +63,6 @@ class PodWrapper(RobotWrapper):
         self.xy_speed = 0.3
         self.flying = False
 
-        # extra movement skills
         self.skillset.add_skill(self.lift, "Move up/down by a distance")
         self.skillset.add_skill(self.land, "Land the drone")
 
@@ -100,14 +93,12 @@ class PodWrapper(RobotWrapper):
             print("Drone started")
     
     def _take_off_from_dog(self):
-        # dog is around 40cm high
         self.podtp.reset_estimator(40)
         count = 0
         while count < 15:
             self.podtp.command_hover(0, 0, 0, self.height)
             time.sleep(0.2)
             count += 1
-        # self.podtp.command_position(0.6, 0, 0, 0)
         self._move(0.6, 0.0)
 
     @overrides
@@ -125,7 +116,6 @@ class PodWrapper(RobotWrapper):
 
         print(f"-> Move by ({dx}, {dy}) m")
         if dx != 0:
-            # self.podtp.command_position(self._cap_dist(dx) / 100.0, 0, 0, 0)
             for i in range(int(abs(dx) * 5 / self.xy_speed)):
                 speed = self.xy_speed if dx > 0 else -self.xy_speed
                 self.podtp.command_hover(speed, 0, 0, self.height)
@@ -134,7 +124,6 @@ class PodWrapper(RobotWrapper):
         time.sleep(EXECUTION_DELAY)
 
         if dy != 0:
-            # self.podtp.command_position(0, self._cap_dist(dy) / 100.0, 0, 0)
             for i in range(int(abs(dy) * 5 / self.xy_speed)):
                 speed = self.xy_speed if dy > 0 else -self.xy_speed
                 self.podtp.command_hover(0, speed, 0, self.height)

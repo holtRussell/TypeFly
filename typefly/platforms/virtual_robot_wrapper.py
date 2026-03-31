@@ -1,120 +1,92 @@
-from typing import Any
-import cv2, time
-import threading
+import cv2
+import time
+from typing import Any, Optional
 from PIL import Image
+import threading
 from overrides import overrides
 
-from ..robot_wrapper import RobotWrapper, RobotObservation
-from ..yolo_client import YoloClient
+from ..robot_wrapper import RobotWrapper
 from ..robot_info import RobotInfo
 
 SKILL_EXECUTION_TIME = 0.2
 
-class VirtualObservation(RobotObservation):
+class VirtualObservation:
     def __init__(self, robot_info: RobotInfo, rate: int = 10):
-        super().__init__(robot_info, rate)
-        self.yolo_client = YoloClient(robot_info)
+        self.interval: float = 1.0 / rate
+        self.robot_info = robot_info
+        self._image: Optional[Image.Image] = None
 
         if "capture" not in robot_info.extra:
             raise ValueError("Robot info must contain 'capture' key in extra, which is the camera index")
 
-        self.cap: cv2.VideoCapture = None
+        self.cap = None
+        self._cam_thread_running = False
+        
         def _capture_spin():
-            # must create the capture and read in the same thread
             self.cap = cv2.VideoCapture(int(self.robot_info.extra["capture"]))
             if not self.cap.isOpened():
-                raise RuntimeError("Failed to open GStreamer pipeline")
-            while self.running:
+                raise RuntimeError("Failed to open camera")
+            while self._cam_thread_running:
                 ret, frame = self.cap.read()
-                if not ret:
-                    continue
-                # Convert the frame to RGB and store it in self._image
-                """
-                Convert the frame to RGB and store it in self._image
-                """
-                self._image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                if ret:
+                    self._image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
                 cv2.waitKey(1)
+                time.sleep(0.1)
         self.capture_thread = threading.Thread(target=_capture_spin)
     
-    @overrides
-    def _start(self):
-        """
-        Start the capture thread
-        """
+    def start(self):
+        self._cam_thread_running = True
         self.capture_thread.start()
 
-    @overrides
-    def _stop(self):
-        """
-        Stop the capture thread and release the capture
-        """
+    def stop(self):
+        self._cam_thread_running = False
         self.capture_thread.join()
         if self.cap is not None:
             self.cap.release()
+        self.cap = None
 
-    @overrides
-    async def process_image(self, image: Image.Image):
-        """
-        Process the image using the YOLO client
-        """
-        await self.yolo_client.detect(image)
+    def process_image(self, image: Image.Image):
+        pass
     
-    @overrides
     def fetch_processed_result(self) -> dict[str, Any]:
-        """
-        Fetch the processed result from the YOLO client
-        """
-        _, object_list = self.yolo_client.latest_result
-        return {
-            "yolo": object_list
-        }
+        return {}
+
+    @property
+    def image(self) -> Optional[Image.Image]:
+        return self._image
 
 class VirtualRobotWrapper(RobotWrapper):
     def __init__(self, robot_info: RobotInfo):
         super().__init__(robot_info, VirtualObservation(robot_info))
 
-        # Example of adding a skill, the function name should be descriptive and concise
         self.skillset.add_skill(self.lift, "Lift the robot by a certain distance")
 
-    """
-    The following 4 methods are required to be implemented by the subclass
-    """
     @overrides
     def start(self) -> bool:
-        """
-        Start the robot
-        """
+        print("-> Starting Virtual Robot...")
         self.obs.start()
+        print("-> Camera initialized, waiting for first frame...")
+        import time
+        while self.obs.image is None:
+            time.sleep(0.1)
+        print("-> Camera feed ready!")
         return True
 
     @overrides
     def stop(self) -> bool:
-        """
-        Stop the robot
-        """
         self.obs.stop()
         return True
 
     @overrides
     def _move(self, dx: float, dy: float):
-        """
-        Basic movement skills
-        """
         print(f"-> Move by ({dx}, {dy}) cm")
         time.sleep(SKILL_EXECUTION_TIME)
 
     @overrides
     def _rotate(self, deg: float):
-        """
-        Basic rotation skills
-        """
         print(f"-> Rotate by {deg} degrees")
         time.sleep(SKILL_EXECUTION_TIME)
 
-
-    """
-    Extra skills to be implemented by the subclass
-    """
     def lift(self, dist: float):
         print(f"-> Lift for {dist} cm")
         time.sleep(SKILL_EXECUTION_TIME)

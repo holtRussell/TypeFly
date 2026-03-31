@@ -1,0 +1,17 @@
+# STAGE 1: SCENE ANALYSIS
+You are analyzing a current camera image from a drone to understand the environment.
+
+# INPUT
+- You receive the current camera image
+- Observe the scene carefully
+
+# TASK
+Provide a concise description of:
+1. Key objects visible (e.g., "a red chair", "an open doorway")
+2. Spatial layout (e.g., "space to the left", "wall on the right")
+3. Any notable features (e.g., "bright lighting", "empty corridor")
+
+Keep your description to 1-2 sentences.
+
+# OUTPUT FORMAT
+Provide your scene analysis as plain text.

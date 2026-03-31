@@ -1,7 +1,8 @@
-# TypeFly
-TypeFly aims to provide an easy platform for developping robot control system with large language models (LLMs). Link to our [full Paper](https://www.computer.org/csdl/journal/tm/2025/09/10970379/260Skt3CSnS) and [webpage](https://typefly.github.io/).
+# TypeFly with VLM
 
-Also, check out the demo video here: [Demo 1: Find edible or drinkable items](http://www.youtube.com/watch?v=HEJYaTLWKfY), [Demo 2: Find a specific chair](http://www.youtube.com/watch?v=QwnBniFaINE).
+TypeFly now uses **Gemma3 Visual Language Models** for end-to-end drone control. The VLM observes raw camera images and makes direct control decisions through a two-stage process:
+1. **Scene Analysis**: VLM describes what it sees in the current image
+2. **Action Decision**: VLM decides actions based on scene + user instruction
 
 ## 1. Installation
 [Optional] Create a conda environment.
@@ -18,41 +19,87 @@ pip install -e .
 ```
 
 ## 2. Hardware Requirement
-Editing `typefly/config/robot_info.json` for different robot setups.
 
-### Test without Robot
-By default, typefly will try to access your camera with `cv2.VideoCapture(0)` and plan with that visual capture. This is for you to quickly try out the planning function.
+### Test without Robot (Virtual Mode) - Recommended for Testing
+By default, typefly will try to access your camera with `cv2.VideoCapture(0)` and let the VLM control movement. This is perfect for testing without physical hardware.
 
 ### Tello Drone
-TypeFly works with the DJI Tello drone. However, since Tello drone requires your device to connect to its WiFi network and TypeFly requires an Internet connection for LLM access, you need to have both WiFi adapter and ethernet adapter to run TypeFly for tello. To use this option, change the `robot_type` from `virtual` to `tello`.
+TypeFly works with the DJI Tello drone. Since Tello requires WiFi and TypeFly needs Internet, you need both WiFi adapter and ethernet adapter. Change `robot_type` from `virtual` to `tello` in `typefly/config/robot_info.json`.
 
 ### Go2 Dog
-To control a Unitree Go2 robot dog with TypeFly, you need to install ROS2 and run the [go2_ros2_sdk](https://github.com/abizovnuralem/go2_ros2_sdk).
+To control a Unitree Go2 robot dog, install ROS2 and run the [go2_ros2_sdk](https://github.com/abizovnuralem/go2_ros2_sdk). Change `robot_type` to `go2`.
 
 ### Other Robots
-To support other robots, you need to implement the robot control interface based on the `RobotWrapper`, see examples in `typefly/platforms/*`.
+Implement robot control interface based on `RobotWrapper` (see `typefly/platforms/*`).
 
 ## 3. OLLAMA API Requirement
 
-TypeFly uses OLLAMA as the local LLM planner. By default, it connects to `http://localhost:11434`. You can configure the OLLAMA URL by setting the `OLLAMA_URL` environment variable.
+TypeFly uses OLLAMA as the local VLM planner. Connects to `http://localhost:11434` by default. Configure via `OLLAMA_URL` environment variable.
 
-## 4. Setup Vision Encoder
-### Local Service
-TypeFly uses YOLO to generate the scene description. We provide a scalable implementation of the http yolo service. Enter this to run the service directly on your machine.
+### Pull the VLM Model
 ```bash
-cd typefly/proto && bash generate.sh
-python -m typefly.serving
+ollama pull gemma3:12b
 ```
 
-### Docker (Optional)
-We recommand using [docker](https://docs.docker.com/engine/install/ubuntu/) to run the YOLO and the http router. To deploy the YOLO servive with docker, please install the [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), then run the following command:
-```bash
-make serving_build
+## 4. Configuration
+
+Edit `typefly/config/robot_info.json` to configure your system:
+
+### Virtual Mode (Default)
+```json
+{
+    "robot_id": "virtual_robot",
+    "robot_type": "virtual",
+    "extra": {
+        "capture": 0,
+        "yolo_enabled": false,
+        "scene_image_log": false,
+        "debug_mode": false
+    }
+}
 ```
 
-## 5. Start TypeFly Web UI
-To play with the TypeFly, please run the following command after setting up the vision service:
+### Tello Drone Mode
+```json
+{
+    "robot_id": "tello1",
+    "robot_type": "tello",
+    "extra": {
+        "yolo_enabled": false
+    }
+}
+```
+
+### Configuration Options
+- `capture`: Camera index (0 for default webcam)
+- `yolo_enabled`: Set to `true` to enable optional YOLO object detection (disabled by default)
+- `scene_image_log`: Set to `true` to display analyzed images in chat log
+- `debug_mode`: Set to `true` to log full VLM responses for debugging
+
+## 5. Vision System
+
+**VLM-Only Architecture!** The VLM (Gemma3-12b) observes raw camera images directly and makes control decisions through two stages:
+1. Scene Analysis: Describes visible objects and layout
+2. Action Decision: Chooses actions based on scene + user instruction
+
+**YOLO is optional**: YOLO service can be enabled via config but is disabled by default.
+
+## 6. Start TypeFly Web UI
 ```bash
 python -m typefly.webui
 ```
-This will start the web UI at `http://localhost:50000`. You should be able to see the image capture window displayed with YOLO detection results. You can test the planning ability of TypeFly by typing in the chat box. (If your vision service is on a different machine (e.g. an edge server or cloud), you need to setup the `EDGE_SERVICE_IP` and `EDGE_SERVICE_PORT` environment variables.)
+Then open http://localhost:50000 in your browser.
+
+### Testing Steps:
+1. Verify setup: `python test_vlm_setup.py`
+2. Start web UI: `python -m typefly.webui`
+3. Type commands in the chat box (e.g., "move forward 2 meters")
+4. Watch the VLM analyze the scene and execute commands
+
+### Sample Commands:
+- "Move forward 2 meters"
+- "Rotate left 90 degrees"
+- "Fly in a square pattern"
+- "Hover and observe surroundings"
+- "Describe the scene"
+

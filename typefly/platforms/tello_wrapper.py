@@ -6,11 +6,7 @@ import threading
 from overrides import overrides
 
 from ..robot_wrapper import RobotWrapper, RobotObservation
-from ..yolo_client import YoloClient
 from ..robot_info import RobotInfo
-
-import logging
-Tello.LOGGER.setLevel(logging.WARNING)
 
 MOVEMENT_MIN = 20
 MOVEMENT_MAX = 300
@@ -24,7 +20,6 @@ class TelloObservation(RobotObservation):
     def __init__(self, drone: Tello, robot_info: RobotInfo, rate: int = 10):
         super().__init__(robot_info, rate)
         self.drone = drone
-        self.yolo_client = YoloClient(robot_info)
 
         def _capture_spin():
             frame_reader = self.drone.get_frame_read()
@@ -32,7 +27,6 @@ class TelloObservation(RobotObservation):
                 frame = None
                 if frame_reader:
                     frame = frame_reader.frame
-                # Convert the frame to RGB and store it in self._image
                 if frame is not None:
                     self._image = Image.fromarray(frame)
                 time.sleep(0.1)
@@ -50,23 +44,16 @@ class TelloObservation(RobotObservation):
 
     @overrides
     async def process_image(self, image: Image.Image):
-        await self.yolo_client.detect(image)
+        pass
     
     @overrides
     def fetch_processed_result(self) -> dict[str, Any]:
-        _, object_list = self.yolo_client.latest_result
-        return {
-            "yolo": object_list
-        }
+        return {}
 
 class TelloWrapper(RobotWrapper):
     def __init__(self, robot_info: RobotInfo):
         self.drone = Tello()
         super().__init__(robot_info, TelloObservation(self.drone, robot_info))
-
-        # extra movement skills
-        self.skillset.add_skill(self.lift, "Move up/down by a distance")
-
 
         self.last_command_time = time.time()
         self.keep_alive_thread = threading.Thread(target=self.keep_alive)
@@ -94,7 +81,6 @@ class TelloWrapper(RobotWrapper):
             return False
         else:
             self.drone.takeoff()
-        # self.move_up(25)
         self.obs.start()
         self.keep_alive_thread.start()
         self.running = True

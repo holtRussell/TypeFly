@@ -91,17 +91,39 @@ from .utils import print_t
 
 ## Special Notes
 
-- **LLM Integration**: Uses OLLAMA models (Llama3, Llama3.1, Llama3.2) via local API at `http://localhost:11434`. Configure with `OLLAMA_URL` environment variable.
-- **Vision**: Uses YOLO models for object detection via gRPC service on port 50050
+- **LLM Integration**: Uses OLLAMA models (Gemma3) via local API at `http://localhost:11434`. Configure with `OLLAMA_URL` environment variable.
+- **Vision**: VLM (Gemma3-12b) analyzes raw camera images through two stages:
+  1. Scene Analysis: Describes visible objects and layout
+  2. Action Decision: Chooses actions based on scene + user instruction
+- **YOLO**: Optional object detection via gRPC service on port 50050 (disabled by default)
 - **Robot Platforms**: Supports virtual (webcam), DJI Tello drone, Unitree Go2 dog, and custom robots via `RobotWrapper` interface
 - **Web UI**: Flask-based at `typefly/webui.py`, runs on port 50000
 
 ## Development
 
 ```bash
-# Start LLM planning with virtual robot
+# Start VLM planning with virtual robot
 python -m typefly.webui
 
-# Start YOLO serving
+# Start YOLO serving (optional)
 python -m typefly.serving
 ```
+
+## Configuration
+
+Edit `typefly/config/robot_info.json` to configure:
+
+```json
+{
+    "extra": {
+        "capture": 0,
+        "yolo_enabled": false,
+        "scene_image_log": false,
+        "debug_mode": false
+    }
+}
+```
+
+- `yolo_enabled`: Enable YOLO object detection (default: false)
+- `scene_image_log`: Log analyzed images to chat (default: false)
+- `debug_mode`: Log full VLM responses (default: false)
