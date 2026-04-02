@@ -1,11 +1,10 @@
 {
-    "robot_id": "virtual_robot",
-    "robot_type": "virtual",
+    "robot_id": "tello1",
+    "robot_type": "tello",
     "extra": {
-        "capture": 0,
         "yolo_enabled": false,
         "scene_image_log": false,
-        "debug_mode": false
+        "debug_mode": true
     }
 }
 

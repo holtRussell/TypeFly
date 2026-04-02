@@ -1,5 +1,5 @@
 import time
-from typing import Any
+from typing import Any, Optional
 from djitellopy import Tello
 from PIL import Image
 import threading
@@ -49,6 +49,16 @@ class TelloObservation(RobotObservation):
     @overrides
     def fetch_processed_result(self) -> dict[str, Any]:
         return {}
+    
+    def wait_for_new_frame(self, timeout: float = 2.0) -> Optional[Image.Image]:
+        """Wait for a new frame from the camera stream"""
+        import time
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if self._image is not None:
+                return self._image
+            time.sleep(0.1)
+        return None
 
 class TelloWrapper(RobotWrapper):
     def __init__(self, robot_info: RobotInfo):

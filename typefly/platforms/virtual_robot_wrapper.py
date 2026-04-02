@@ -54,6 +54,16 @@ class VirtualObservation:
     @property
     def image(self) -> Optional[Image.Image]:
         return self._image
+    
+    def wait_for_new_frame(self, timeout: float = 2.0) -> Optional[Image.Image]:
+        """Wait for a new frame from the camera stream"""
+        import time
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if self._image is not None:
+                return self._image
+            time.sleep(0.1)
+        return None
 
 class VirtualRobotWrapper(RobotWrapper):
     def __init__(self, robot_info: RobotInfo):

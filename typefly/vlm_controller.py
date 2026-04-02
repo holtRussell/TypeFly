@@ -63,34 +63,99 @@ class VLMController():
         print_t(f"[UI] Image size: {img.size if img else None}")
         return img
 
+    def extract_object_context(self, user_instruction: str) -> tuple[str, str]:
+        import re
+        
+        find_pattern = r'(find|look for|search for|locate)\s+([a-zA-Z0-9\s]+?)(?:\b(in|at|near)\b|$)'
+        match = re.search(find_pattern, user_instruction.lower())
+        
+        if match:
+            object_desc = match.group(2).strip()
+            return object_desc, user_instruction
+        
+        scan_pattern = r'scan for\s+([a-zA-Z0-9\s]+?)(?:\b(with|that has)\b|$)'
+        match = re.search(scan_pattern, user_instruction.lower())
+        
+        if match:
+            object_desc = match.group(1).strip()
+            return object_desc, user_instruction
+        
+        return "", user_instruction
+
     def plan_loop(self, user_instruction: str):
         from .vlm_planner import VLMPlanner
+        from .robot_wrapper import ScanResult
 
         print_t(f"[VLM] Starting plan loop for: {user_instruction}")
 
+        scan_result: ScanResult = None
+        scan_pending = False
+
         while True:
-            current_image = self.robot.obs.image
-            if current_image is None:
-                print_t("[VLM] No image available, waiting...")
-                import time
-                time.sleep(0.5)
-                continue
+            if scan_pending:
+                print_t("[VLM] Waiting for fresh frame after scan...")
+                current_image = self.robot.obs.wait_for_new_frame(timeout=3.0)
+                if current_image is None:
+                    print_t("[VLM] Timeout waiting for fresh frame, using latest available...")
+                    current_image = self.robot.obs.image
+                else:
+                    print_t(f"[VLM] Got fresh frame: {current_image.size}")
+                
+                if current_image is not None:
+                    scene_desc = self.planner.describe_scene_vlm(current_image)
+                    print_t(f"[VLM] Scene (post-scan): {scene_desc}")
+                    
+                    scene_image_log = self.robot.robot_info.get_scene_image_log()
+                    if scene_image_log:
+                        buffer = io.BytesIO()
+                        current_image.save(buffer, format="JPEG")
+                        encoded_img = base64.b64encode(buffer.getvalue()).decode("utf-8")
+                        _USER_LOG_QUEUE.put(f'<img src="data:image/jpeg;base64,{encoded_img}" />')
+                    
+                    _USER_LOG_QUEUE.put(f'[VLM] Scene: {scene_desc}')
+                    
+                    if scan_result is not None:
+                        scan_context = f"\n\n## SCAN RESULTS\nObject found: {scan_result.found}\nLocation: {scan_result.location}\nDistance: {scan_result.distance}\nDescription: {scan_result.description}"
+                        scene_desc_with_scan = scene_desc + scan_context
+                        _USER_LOG_QUEUE.put(f'[VLM] Scan Results: {str(scan_result)}')
+                    else:
+                        scene_desc_with_scan = scene_desc
+                else:
+                    print_t("[VLM] No image available after scan")
+                    import time
+                    time.sleep(1.0)
+                    continue
+                
+                scan_pending = False
+            else:
+                current_image = self.robot.obs.image
+                if current_image is None:
+                    print_t("[VLM] No image available, waiting...")
+                    import time
+                    time.sleep(0.5)
+                    continue
 
-            print_t(f"[VLM] Got image: {current_image.size}")
+                print_t(f"[VLM] Got image: {current_image.size}")
 
-            scene_desc = self.planner.describe_scene_vlm(current_image)
-            print_t(f"[VLM] Scene: {scene_desc}")
-            
-            scene_image_log = self.robot.robot_info.get_scene_image_log()
-            if scene_image_log:
-                buffer = io.BytesIO()
-                current_image.save(buffer, format="JPEG")
-                encoded_img = base64.b64encode(buffer.getvalue()).decode("utf-8")
-                _USER_LOG_QUEUE.put(f'<img src="data:image/jpeg;base64,{encoded_img}" />')
-            
-            _USER_LOG_QUEUE.put(f'[VLM] Scene: {scene_desc}')
+                scene_desc = self.planner.describe_scene_vlm(current_image)
+                print_t(f"[VLM] Scene: {scene_desc}")
+                
+                scene_image_log = self.robot.robot_info.get_scene_image_log()
+                if scene_image_log:
+                    buffer = io.BytesIO()
+                    current_image.save(buffer, format="JPEG")
+                    encoded_img = base64.b64encode(buffer.getvalue()).decode("utf-8")
+                    _USER_LOG_QUEUE.put(f'<img src="data:image/jpeg;base64,{encoded_img}" />')
+                
+                _USER_LOG_QUEUE.put(f'[VLM] Scene: {scene_desc}')
 
-            vlm_output = self.planner.plan_action(user_instruction, scene_desc, current_image)
+                if scan_result is not None and scan_result.found:
+                    scan_context = f"\n\n## SCAN RESULTS\nObject found: {scan_result.found}\nLocation: {scan_result.location}\nDistance: {scan_result.distance}\nDescription: {scan_result.description}"
+                    scene_desc_with_scan = scene_desc + scan_context
+                else:
+                    scene_desc_with_scan = scene_desc
+
+            vlm_output = self.planner.plan_action(user_instruction, scene_desc_with_scan, current_image)
             print_t(f"[VLM] Action: {vlm_output}")
             
             if self.robot.robot_info.get_debug_mode():
@@ -99,6 +164,20 @@ class VLMController():
             _USER_LOG_QUEUE.put(f'[VLM] Action: {vlm_output}')
 
             success = self.planner.execute_action(vlm_output)
+
+            if "scan" in vlm_output.lower():
+                print_t("[VLM] Scan action detected, gathering results...")
+                import re
+                match = re.search(r'([a-zA-Z0-9\s]+?)(?:\bat\b|$)', vlm_output, re.IGNORECASE)
+                object_desc = match.group(1).strip() if match else ""
+                if object_desc:
+                    scan_result = self.robot.scan_for_object(object_desc)
+                else:
+                    scan_result = self.robot.scan_for_object("object")
+                scan_pending = True
+                print_t(f"[VLM] Scan complete. Found: {scan_result.found}")
+            else:
+                scan_result = None
 
             _USER_LOG_QUEUE.put(f'[VLM] Executed: {vlm_output}')
 

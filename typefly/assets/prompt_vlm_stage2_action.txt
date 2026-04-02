@@ -17,7 +17,9 @@ Examples:
 [ACTION] rotate left 90
 [ACTION] move forward 1.0
 [ACTION] hover
-[ACTION] scan
+[ACTION] scan for blue backpack
+[ACTION] scan for red chair
+[ACTION] scan for person in yellow shirt
 
 # CONTEXT
 ## SCENE ANALYSIS

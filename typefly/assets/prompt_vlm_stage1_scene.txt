@@ -15,3 +15,12 @@ Keep your description to 1-2 sentences.
 
 # OUTPUT FORMAT
 Provide your scene analysis as plain text.
+
+# OBJECT SEARCH MODE
+If you are looking for a specific object, focus your description on:
+1. Whether the target object is visible
+2. Its location relative to the drone
+3. Any distinctive features (color, size, shape)
+4. Obstructions or occlusions
+
+When scanning, report: "I see [object]" or "I do not see [object] in this view"

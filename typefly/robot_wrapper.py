@@ -12,6 +12,15 @@ from .robot_info import RobotInfo
 from .skill_item import PROBE_RET_TYPE
 from .utils import evaluate_value, print_t
 
+from dataclasses import dataclass
+
+@dataclass
+class ScanResult:
+    found: bool
+    location: str
+    distance: str
+    description: str
+
 class RobotObservation(ABC):
     def __init__(self, robot_info: RobotInfo, rate: int):
         self.interval: float = 1.0 / rate
@@ -24,6 +33,7 @@ class RobotObservation(ABC):
 
         self.running: bool = False
         self.processing_thread = threading.Thread(target=self.update_observation, daemon=True)
+        self._last_update_time: float = 0.0
 
     def start(self):
         self.running = True
@@ -76,6 +86,8 @@ class RobotObservation(ABC):
                 tasks = {t for t in tasks if not t.done()}
                 self._image_process_result = self.fetch_processed_result()
                 elapsed_time = time.time() - start_time
+                if self._image is not None:
+                    self._last_update_time = time.time()
                 await asyncio.sleep(max(0, self.interval - elapsed_time))
         loop.run_until_complete(schedule_tasks())
 
@@ -86,6 +98,16 @@ class RobotObservation(ABC):
     @abstractmethod
     def fetch_processed_result(self) -> dict[str, Any]:
         pass
+    
+    def wait_for_new_frame(self, timeout: float = 2.0) -> Optional[Image.Image]:
+        """Wait for a new frame after the current time"""
+        import time
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if self._image is not None:
+                return self._image
+            time.sleep(0.1)
+        return None
 
 class RobotWrapper(ABC):
     controller_func: list[callable] = []
@@ -108,7 +130,7 @@ class RobotWrapper(ABC):
         ]
 
         high_level_skills = [
-            (self.scan, "Scan for a specific object"),
+            (self.scan_for_object, "Scan for a specific object with description (e.g., 'scan for blue backpack')"),
         ]
 
         self.skillset: SkillSet = SkillSet.get_common_skillset(common_movement_skill_func + other_skills + high_level_skills)
@@ -169,8 +191,114 @@ class RobotWrapper(ABC):
     def probe(self, query: str) -> PROBE_RET_TYPE:
         return evaluate_value(self.controller_func[1](query, self.robot_info))
 
-    def scan(self, object_name: str) -> bool:
-        print(f"-> Scan for {object_name}")
-        for _ in range(8):
+    def scan_for_object(self, object_description: str) -> ScanResult:
+        print(f"-> Scan for: {object_description}")
+        
+        for i in range(8):
             self.rotate_left(45)
-        return True
+            
+            import time
+            time.sleep(0.5)
+            
+            current_image = self.obs.wait_for_new_frame(timeout=1.0)
+            if not current_image:
+                continue
+            
+            if self._check_object_in_frame(current_image, object_description):
+                location_analysis = self._analyze_location(current_image, object_description)
+                self.log(f"Found {object_description}: {location_analysis['description']}")
+                return ScanResult(
+                    found=True,
+                    location=location_analysis.get("location", "center"),
+                    distance=location_analysis.get("distance", "unknown"),
+                    description=location_analysis.get("description", "")
+                )
+        
+        self.log(f"Did not find: {object_description}")
+        return ScanResult(
+            found=False,
+            location="not visible",
+            distance="unknown",
+            description="Object not found after 360° scan"
+        )
+    
+    def _analyze_location(self, image: Image.Image, object_desc: str) -> dict:
+        prompt = f"""# LOCATION ANALYSIS
+Object: {object_desc}
+
+Observe the current frame and determine:
+1. Location (left/right/center of frame)
+2. Distance estimate (close/medium/far based on apparent size)
+3. Brief description of surroundings
+
+Format: location:X distance:Y description:Z"""
+        
+        try:
+            from .llm_wrapper import LLMWrapper, ModelType
+            llm = LLMWrapper()
+            response = llm.request_multimodal(prompt, image, ModelType.GEMMA3)
+            return self._parse_location_response(response)
+        except Exception as e:
+            print_t(f"[_analyze_location] Error: {e}")
+            return {"location": "center", "distance": "unknown", "description": response}
+    
+    def _parse_location_response(self, response: str) -> dict:
+        result = {"location": "center", "distance": "unknown", "description": response}
+        
+        response_lower = response.lower()
+        
+        if "location:left" in response_lower or "left" in response_lower:
+            result["location"] = "left"
+        elif "location:right" in response_lower or "right" in response_lower:
+            result["location"] = "right"
+        elif "location:center" in response_lower or "center" in response_lower:
+            result["location"] = "center"
+        
+        if "distance:close" in response_lower or "close" in response_lower:
+            result["distance"] = "close"
+        elif "distance:medium" in response_lower or "medium" in response_lower:
+            result["distance"] = "medium"
+        elif "distance:far" in response_lower or "far" in response_lower:
+            result["distance"] = "far"
+        
+        return result
+    
+    def get_obj_list_str(self) -> str:
+        """Return string representation of detected objects"""
+        if not hasattr(self.obs, '_image_process_result') or not self.obs._image_process_result:
+            return "No objects detected"
+        
+        objects = self.obs._image_process_result.get("objects", [])
+        if not objects:
+            return "No objects detected"
+        
+        return "\n".join(str(obj) for obj in objects)
+
+    def _check_object_in_frame(self, image: Image.Image, object_description: str) -> bool:
+        prompt = f"""# TASK: OBJECT VERIFICATION
+You are analyzing a drone camera image to verify if a specific object is visible.
+
+# OBJECT TO FIND
+{object_description}
+
+# INSTRUCTIONS
+1. Look carefully at the image
+2. Determine if {object_description} is visible
+3. Respond with:
+   - [YES] if the object is clearly visible
+   - [NO] if the object is not visible or not visible
+   - [UNCLEAR] if you cannot determine safely
+
+# OUTPUT FORMAT
+Respond with ONLY: [YES], [NO], or [UNCLEAR]"""
+        
+        try:
+            from .llm_wrapper import LLMWrapper, ModelType
+            llm = LLMWrapper()
+            response = llm.request_multimodal(prompt, image, ModelType.GEMMA3)
+            response_lower = response.strip().lower()
+            
+            return "[yes]" in response_lower or response_lower.startswith("yes")
+        except Exception as e:
+            print_t(f"[_check_object_in_frame] Error: {e}")
+            return False

@@ -57,14 +57,48 @@ class VLMPlanner:
         
         return self.llm.request_multimodal(prompt, scaled_image, self.model_type)
 
-    def plan(self, user_instruction: str, image=None) -> str:
+    def describe_scene_vlm_with_target(self, image: Image.Image, target_object: str) -> str:
+        scaled_image = self._scale_image(image)
+        
+        prompt_template = """# STAGE 1: SCENE ANALYSIS WITH TARGET FOCUS
+You are analyzing a current camera image from a drone to find a specific object.
+
+# OBJECT TO FIND
+{target_object}
+
+# INPUT
+- You receive the current camera image
+- Observe the scene carefully
+
+# TASK
+Provide a concise analysis of:
+1. Is the target object visible? (YES/NO/Unclear)
+2. If visible: location (left/right/center), approximate distance, distinctive features
+3. If not visible: areas that should be checked next
+4. Overall scene context (room layout, obstacles, lighting)
+
+# OUTPUT FORMAT
+- Visibility: [YES/NO/Unclear]
+- Location: [description]
+- Features: [description]
+- Scene context: [1-2 sentences]
+
+# VISIBILITY CUE
+If the object is visible, you MUST respond with [YES] at the start of your response.
+If the object is not visible, you MUST respond with [NO] at the start of your response."""
+        
+        prompt = prompt_template.format(target_object=target_object)
+        scene_description = self.llm.request_multimodal(prompt, scaled_image, self.model_type)
+        return scene_description.strip()
+
+    def plan_with_target(self, user_instruction: str, target_object: str, image=None) -> str:
         from .skill_item import SkillItem
 
         if image is None:
             raise ValueError("Image is required for VLM planning")
 
-        scene_description = self.describe_scene_vlm(image)
-        print_t(f"[VLM] Scene: {scene_description}")
+        scene_description = self.describe_scene_vlm_with_target(image, target_object)
+        print_t(f"[VLM] Scene (target: {target_object}): {scene_description}")
 
         vlm_output = self.plan_action(user_instruction, scene_description, image)
         print_t(f"[VLM] Action: {vlm_output}")
@@ -134,8 +168,16 @@ class VLMPlanner:
             print_t("[VLM] Move down command received")
         elif 'stop' in action_lower or 'hover' in action_lower or 'wait' in action_lower:
             time.sleep(2.0)
+        elif 'scan for' in action_lower:
+            match = re.search(r'([a-zA-Z0-9\s]+?)(?:\bat\b|$)', action_body, re.IGNORECASE)
+            object_desc = match.group(1).strip() if match else ""
+            if object_desc:
+                self.robot.scan_for_object(object_desc)
+            else:
+                print_t("[VLM] No object description in scan command")
+                return False
         elif 'scan' in action_lower:
-            self.robot.scan("object")
+            self.robot.scan_for_object("object")
         elif 'describe' in action_lower or 'observation' in action_lower:
             current_image = self.robot.obs.image
             if current_image:
