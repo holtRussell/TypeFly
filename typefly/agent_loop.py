@@ -1,13 +1,13 @@
 from PIL import Image
 import queue, io, base64
-from typing import Optional
+from typing import Optional, List, Dict, Any
 import threading
 import json
 import builtins
+from datetime import datetime
 
 from .llm_wrapper import ModelType, LLMWrapper
 from .robot_wrapper import RobotWrapper
-from .vlm_planner import VLMPlanner
 from .skill_item import SkillItem
 from .utils import print_t
 from .robot_info import RobotInfo
@@ -121,7 +121,6 @@ class AgentLoop:
         print_t(f"[AgentLoop] Max iterations ({self.max_tool_calls}) reached")
         return "I have completed my maximum number of tool calls. Please try again.", self.messages
 
-
 class VLMController():
     def __init__(self, robot_info: RobotInfo, model_type: ModelType = ModelType.GEMMA3):
         self.controller_func = [
@@ -144,7 +143,7 @@ class VLMController():
             self.robot = PodWrapper(robot_info)
         
         self.llm = LLMWrapper()
-        self.planner = VLMPlanner(self.robot, model_type)
+        self.planner = None
         self.agent_loop = AgentLoop(self.robot, self.llm, model_type)
         self.current_plan_loop_thread = None
 
@@ -161,11 +160,13 @@ class VLMController():
         return True
 
     def _probe(self, query: str, robot_info: RobotInfo) -> str:
-        return self.planner.probe(query, robot_info)
+        if self.planner:
+            return self.planner.probe(query, robot_info)
+        return ""
 
     def start_controller(self):
         self.robot.start()
-        
+
     def stop_controller(self):
         self.robot.stop()
 
@@ -204,6 +205,8 @@ class VLMController():
         iterations = 0
         target_found = False
 
+        self.planner = VLMPlanner(self.robot, self.model_type)
+
         while iterations < max_iterations and not target_found:
             iterations += 1
             print_t(f"[VLM] Iteration {iterations}/{max_iterations}")
@@ -217,7 +220,7 @@ class VLMController():
 
             print_t(f"[VLM] Got image: {current_image.size}")
 
-            print_t("[VLM] Using VLMPlanner for reasoning...")
+            print_t("[VLM] Using VLMPlanner for planning...")
             plan = self.planner.plan_with_reasoning(user_instruction, current_image)
 
             import json

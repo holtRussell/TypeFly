@@ -3,7 +3,9 @@ import requests
 from enum import Enum
 import base64
 import io
+import json
 from PIL import Image
+from typing import Optional, List, Dict, Any
 
 class ModelType(Enum):
     LLAMA3_8B = "llama3:8b-10k"
@@ -47,7 +49,19 @@ class LLMWrapper:
 
         return ret
 
-    def request_multimodal(self, prompt: str, image: Image.Image, model_type: ModelType | str = ModelType.GEMMA3) -> str:
+    def request_multimodal(self, prompt: str, image: Image.Image, model_type: ModelType | str = ModelType.GEMMA3, tools: Optional[List] = None) -> tuple[str, Optional[List], str]:
+        """
+        Send a multimodal request to Ollama. Now supports tool calling.
+        
+        Args:
+            prompt: The user prompt
+            image: The image to analyze
+            model_type: The model to use
+            tools: Optional list of tools in Ollama format
+            
+        Returns:
+            Tuple of (response_content, tool_calls, done_reason)
+        """
         model_name = model_type.value if isinstance(model_type, ModelType) else model_type
 
         buffered = io.BytesIO()
@@ -71,14 +85,22 @@ class LLMWrapper:
             }],
             "stream": False
         }
+        
+        if tools:
+            payload["tools"] = tools
 
         response = requests.post(f"{self.ollama_url}/api/chat", json=payload)
         response.raise_for_status()
         
-        ret = response.json().get("message", {}).get("content", "")
+        response_json = response.json()
+        message = response_json.get("message", {})
+        
+        content = message.get("content", "")
+        tool_calls = message.get("tool_calls", [])
+        done_reason = response_json.get("done_reason", "stop")
 
         with open(CHAT_LOG_FILE, "a") as f:
             f.write(prompt + "\n---\n")
-            f.write(ret + "\n--------------------------------\n")
+            f.write(content + "\n--------------------------------\n")
 
-        return ret
+        return content, tool_calls, done_reason
