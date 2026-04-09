@@ -1,7 +1,7 @@
 import os
 import re
 import json
-from typing import Optional
+from typing import Optional, List
 from PIL import Image
 
 from .llm_wrapper import LLMWrapper, ModelType
@@ -12,7 +12,7 @@ from .skill_item import SkillItem
 
 
 class VLMPlanner:
-    def __init__(self, robot: RobotWrapper, model_type: ModelType = ModelType.GEMMA3):
+    def __init__(self, robot: RobotWrapper, model_type: ModelType = ModelType.GEMMA4):
         self.llm = LLMWrapper()
         self.robot = robot
         self.model_type = model_type
@@ -30,6 +30,15 @@ class VLMPlanner:
         image.save(buffered, format="JPEG")
         return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
+    def _call_llm(self, prompt: str, image: Image.Image, num_visual_tokens: Optional[int] = None, system_prompt: Optional[str] = None) -> tuple[str, Optional[List], str]:
+        """Call LLM with Gemma4 optimizations for faster image analysis"""
+        return self.llm.request_multimodal(
+            prompt, image, self.model_type,
+            temperature=1.0,
+            num_visual_tokens=num_visual_tokens,
+            system_prompt=system_prompt
+        )
+
     def _scale_image(self, image, target_width=320):
         w, h = image.size
         if w <= target_width:
@@ -44,7 +53,7 @@ class VLMPlanner:
             robot_skills=str(self.robot.skillset)
         )
         
-        scene_description = self.llm.request_multimodal(prompt, scaled_image, self.model_type)
+        scene_description, _, _ = self._call_llm(prompt, scaled_image, num_visual_tokens=70)
         return scene_description.strip()
 
     def plan_action(self, user_instruction: str, scene_description: str, image: Image.Image) -> str:
@@ -56,7 +65,8 @@ class VLMPlanner:
             scene_context=scene_description
         )
         
-        return self.llm.request_multimodal(prompt, scaled_image, self.model_type)
+        result, _, _ = self._call_llm(prompt, scaled_image, num_visual_tokens=140)
+        return result
 
     def describe_scene_vlm_with_target(self, image: Image.Image, target_object: str) -> str:
         scaled_image = self._scale_image(image)
@@ -89,7 +99,7 @@ If the object is visible, you MUST respond with [YES] at the start of your respo
 If the object is not visible, you MUST respond with [NO] at the start of your response."""
         
         prompt = prompt_template.format(target_object=target_object)
-        scene_description = self.llm.request_multimodal(prompt, scaled_image, self.model_type)
+        scene_description, _, _ = self._call_llm(prompt, scaled_image, num_visual_tokens=70)
         return scene_description.strip()
 
     def plan_with_target(self, user_instruction: str, target_object: str, image=None) -> str:
@@ -119,9 +129,9 @@ If the object is not visible, you MUST respond with [NO] at the start of your re
         with open(os.path.join(assets_path, "prompt_exploration_reasoning.txt"), "r") as f:
             prompt_reasoning = f.read()
         
-        prompt = prompt_reasoning.format(user_instruction=user_instruction)
+        system_prompt = "<|think|>\nYou are a precise robot controller that reasons step-by-step before acting."
         
-        response = self.llm.request_multimodal(prompt, scaled_image, self.model_type)
+        response, _, _ = self._call_llm(prompt_reasoning.format(user_instruction=user_instruction), scaled_image, num_visual_tokens=280, system_prompt=system_prompt)
         
         print_t(f"[VLM] Reasoning response: {response}")
         
@@ -171,7 +181,7 @@ You are analyzing a camera image to verify if a specific object is present.
 Respond with ONLY: [YES], [NO], or [UNCLEAR]"""
         
         try:
-            response = self.llm.request_multimodal(prompt, scaled_image, self.model_type)
+            response, _, _ = self._call_llm(prompt, scaled_image, num_visual_tokens=70)
             response_lower = response.strip().lower()
             
             is_found = "[yes]" in response_lower or response_lower.startswith("yes")
@@ -217,15 +227,16 @@ Return JSON with:
 If object is on the right side:
 {{
   "analysis": "Object visible on right side, 2m away",
-  "reasoning": "Need to rotate right to face object, move closer for better view",
-  "actions": [
-    {{"action": "move_forward", "dist": 1.0}},
-    {{"action": "rotate", "deg": 90}}
-  ]
-}}"""
+   "reasoning": "Need to rotate right to face object, move closer for better view",
+   "actions": [
+     {{"action": "move_forward", "dist": 1.0}},
+     {{"action": "rotate", "deg": 90}}
+   ]
+ }}"""
         
         try:
-            response = self.llm.request_multimodal(prompt, scaled_image, self.model_type)
+            system_prompt = "<|think|>\nYou are a precise robot controller that reasons about positioning."
+            response, _, _ = self._call_llm(prompt, scaled_image, num_visual_tokens=140, system_prompt=system_prompt)
             
             response_clean = response.strip()
             if response_clean.startswith('```json'):

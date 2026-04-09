@@ -20,7 +20,7 @@ class AgentLoop:
     Manages message history and tool execution loop.
     """
     
-    def __init__(self, robot: RobotWrapper, llm: LLMWrapper, model_type: ModelType = ModelType.GEMMA3):
+    def __init__(self, robot: RobotWrapper, llm: LLMWrapper, model_type: ModelType = ModelType.GEMMA4):
         self.robot = robot
         self.llm = llm
         self.model_type = model_type
@@ -80,7 +80,7 @@ class AgentLoop:
             iteration += 1
             
             content, tool_calls, done_reason = self.llm.request_multimodal(
-                user_prompt, image, self.model_type, tools
+                user_prompt, image, self.model_type, tools, temperature=1.0
             )
             
             self.add_message("assistant", content, tool_calls if tool_calls else None)
@@ -122,7 +122,7 @@ class AgentLoop:
         return "I have completed my maximum number of tool calls. Please try again.", self.messages
 
 class VLMController():
-    def __init__(self, robot_info: RobotInfo, model_type: ModelType = ModelType.GEMMA3):
+    def __init__(self, robot_info: RobotInfo, model_type: ModelType = ModelType.GEMMA4):
         self.controller_func = [
             self._user_log,
             self._probe

@@ -20,7 +20,7 @@ class AgentLoop:
     Manages message history and tool execution loop.
     """
     
-    def __init__(self, robot: RobotWrapper, llm: LLMWrapper, model_type: ModelType = ModelType.GEMMA3):
+    def __init__(self, robot: RobotWrapper, llm: LLMWrapper, model_type: ModelType = ModelType.GEMMA4):
         self.robot = robot
         self.llm = llm
         self.model_type = model_type
@@ -123,7 +123,7 @@ class AgentLoop:
 
 
 class VLMController():
-    def __init__(self, robot_info: RobotInfo, model_type: ModelType = ModelType.GEMMA3):
+    def __init__(self, robot_info: RobotInfo, model_type: ModelType = ModelType.GEMMA4):
         self.controller_func = [
             self._user_log,
             self._probe

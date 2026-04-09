@@ -15,6 +15,7 @@ class ModelType(Enum):
     LLAMA3_2 = "llama3.2"
     GEMMA3N = "gemma3n:e4b"
     GEMMA3 = "gemma3:12b"
+    GEMMA4 = "gemma4:26b"
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 CHAT_LOG_FILE = os.path.join(CURRENT_DIR, "assets/chat_log.txt")
@@ -24,11 +25,11 @@ class LLMWrapper:
     """
     A wrapper for the LLM API.
     """
-    def __init__(self, temperature: float=0.1):
+    def __init__(self, temperature: float=1.0):
         self.temperature = temperature
         self.ollama_url = OLLAMA_URL
 
-    def request(self, prompt, model_type: ModelType | str) -> str:        
+    def request(self, prompt, model_type: ModelType | str, temperature: Optional[float] = None) -> str:        
         model_name = model_type.value if isinstance(model_type, ModelType) else model_type
 
         payload = {
@@ -37,6 +38,9 @@ class LLMWrapper:
             "temperature": self.temperature,
             "stream": False
         }
+        
+        if temperature is not None:
+            payload["temperature"] = temperature
 
         response = requests.post(f"{self.ollama_url}/api/generate", json=payload)
         response.raise_for_status()
@@ -49,7 +53,7 @@ class LLMWrapper:
 
         return ret
 
-    def request_multimodal(self, prompt: str, image: Image.Image, model_type: ModelType | str = ModelType.GEMMA3, tools: Optional[List] = None) -> tuple[str, Optional[List], str]:
+    def request_multimodal(self, prompt: str, image: Image.Image, model_type: ModelType | str = ModelType.GEMMA4, tools: Optional[List] = None, temperature: Optional[float] = None, num_visual_tokens: Optional[int] = None, system_prompt: Optional[str] = None) -> tuple[str, Optional[List], str]:
         """
         Send a multimodal request to Ollama. Now supports tool calling.
         
@@ -58,6 +62,9 @@ class LLMWrapper:
             image: The image to analyze
             model_type: The model to use
             tools: Optional list of tools in Ollama format
+            temperature: Optional temperature override (default: 1.0 for Gemma4)
+            num_visual_tokens: Optional visual token budget (70, 140, 280, 560, 1120)
+            system_prompt: Optional system prompt for thinking mode (<|think|>)
             
         Returns:
             Tuple of (response_content, tool_calls, done_reason)
@@ -78,16 +85,26 @@ class LLMWrapper:
 
         payload = {
             "model": model_name,
-            "messages": [{
-                "role": "user",
-                "content": prompt,
-                "images": [image_base64]
-            }],
-            "stream": False
+            "messages": []
         }
+        
+        if system_prompt:
+            payload["messages"].append({"role": "system", "content": system_prompt})
+        
+        payload["messages"].append({
+            "role": "user",
+            "content": prompt,
+            "images": [image_base64]
+        })
         
         if tools:
             payload["tools"] = tools
+        
+        if temperature is not None:
+            payload["temperature"] = temperature
+        
+        if num_visual_tokens is not None:
+            payload["num_visual_tokens"] = num_visual_tokens
 
         response = requests.post(f"{self.ollama_url}/api/chat", json=payload)
         response.raise_for_status()

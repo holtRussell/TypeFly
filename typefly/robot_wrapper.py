@@ -236,7 +236,7 @@ Format: location:X distance:Y description:Z"""
         try:
             from .llm_wrapper import LLMWrapper, ModelType
             llm = LLMWrapper()
-            response = llm.request_multimodal(prompt, image, ModelType.GEMMA3)
+            response = llm.request_multimodal(prompt, image, ModelType.GEMMA4)
             return self._parse_location_response(response)
         except Exception as e:
             print_t(f"[_analyze_location] Error: {e}")
@@ -295,7 +295,7 @@ Respond with ONLY: [YES], [NO], or [UNCLEAR]"""
         try:
             from .llm_wrapper import LLMWrapper, ModelType
             llm = LLMWrapper()
-            response = llm.request_multimodal(prompt, image, ModelType.GEMMA3)
+            response = llm.request_multimodal(prompt, image, ModelType.GEMMA4)
             response_lower = response.strip().lower()
             
             return "[yes]" in response_lower or response_lower.startswith("yes")

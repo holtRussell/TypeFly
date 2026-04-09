@@ -9,7 +9,7 @@ import io
 from PIL import Image
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-MODEL = "gemma3:12b"
+MODEL = "gemma4:26b"
 
 # Try to import tkinter (optional for preview)
 HAS_TKINTER = False
