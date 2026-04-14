@@ -4,6 +4,7 @@ from typing import Optional
 import threading
 import json
 import builtins
+import time
 
 from .llm_wrapper import ModelType, LLMWrapper
 from .robot_wrapper import RobotWrapper
@@ -228,6 +229,27 @@ class VLMController():
             if plan.get("decision") == "target_found":
                 target_found = True
                 self.robot.log(f"I found the target object!")
+                break
+
+            if plan.get("decision") == "describe_scene":
+                actions = plan.get("actions", [])
+                if actions:
+                    print_t(f"[VLM] Executing {len(actions)} actions...")
+                    for i, action in enumerate(actions):
+                        action_text = json.dumps(action)
+                        success, action_target_found = self.planner.execute_action(action_text, current_image)
+                        if not success:
+                            print_t(f"[VLM] Action failed at step {i+1}/{len(actions)}")
+                        if action_target_found:
+                            target_found = True
+                            break
+                        time.sleep(1.0)
+                        current_image = self.robot.obs.wait_for_new_frame(timeout=2.0)
+                        if current_image is None:
+                            current_image = self.robot.obs.image
+                else:
+                    print_t("[VLM] No actions needed for description mode")
+                    self.robot.log(f"I see: {plan.get('observation', 'N/A')}")
                 break
 
             actions = plan.get("actions", [])

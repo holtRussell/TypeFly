@@ -109,12 +109,44 @@ class LLMWrapper:
         response = requests.post(f"{self.ollama_url}/api/chat", json=payload)
         response.raise_for_status()
         
-        response_json = response.json()
-        message = response_json.get("message", {})
+        # Parse response - Ollama may send newline-delimited JSON even with stream: false
+        # We need to get the last complete message where done: true
+        text = response.text.strip()
         
-        content = message.get("content", "")
-        tool_calls = message.get("tool_calls", [])
-        done_reason = response_json.get("done_reason", "stop")
+        content = ""
+        tool_calls = []
+        done_reason = "stop"
+        
+        # Try to parse as single JSON first (most common)
+        try:
+            response_json = json.loads(text)
+            message = response_json.get("message", {})
+            content = message.get("content", "")
+            tool_calls = message.get("tool_calls", [])
+            done_reason = response_json.get("done_reason", "stop")
+        except json.JSONDecodeError:
+            # Parse as NDJSON (newline-delimited JSON) - concatenate all content
+            lines = text.split('\n')
+            for line in lines:
+                try:
+                    line_json = json.loads(line)
+                    message = line_json.get("message", {})
+                    
+                    # Concatenate content from all chunks
+                    chunk_content = message.get("content", "")
+                    if chunk_content:
+                        content += chunk_content
+                    
+                    # Collect tool calls if any
+                    if message.get("tool_calls"):
+                        tool_calls.extend(message.get("tool_calls", []))
+                    
+                    # Track done status
+                    if line_json.get("done", False):
+                        done_reason = line_json.get("done_reason", "stop")
+                        break  # We got the final result
+                except:
+                    continue
 
         with open(CHAT_LOG_FILE, "a") as f:
             f.write(prompt + "\n---\n")
