@@ -17,15 +17,15 @@ class ModelType(Enum):
     LLAMA3_70B = "meta-llama/Meta-Llama-3-70B-Instruct"
     LLAMA3_1 = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     LLAMA3_2 = "meta-llama/Meta-Llama-3.2-8B-Instruct"
-    GEMMA3N = "google/gemma-4-E2B-it"
-    GEMMA3 = "google/gemma-4-E2B-it"
+    GEMMA3N = "gemma-4-E2B-it"
+    GEMMA3 = "gemma-4-E2B-it"
 
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 CHAT_LOG_FILE = os.path.join(CURRENT_DIR, "assets/chat_log.txt")
 
-VLLM_URL = os.environ.get("VLLM_URL", "http://localhost:8000/v1")
-VLLM_API_KEY = os.environ.get("VLLM_API_KEY", "token-abc123")
+LLAMA_SERVER_URL = os.environ.get("LLAMA_SERVER_URL", "http://localhost:8080/v1")
+LLAMA_SERVER_API_KEY = os.environ.get("LLAMA_SERVER_API_KEY", "token-abc123")
 
 
 def print_t(msg: str) -> None:
@@ -34,19 +34,19 @@ def print_t(msg: str) -> None:
 
 class LLMWrapper:
     """
-    A wrapper for vLLM API using OpenAI client format.
+    A wrapper for llama.cpp server (OpenAI-compatible API).
     """
     def __init__(self, temperature: float = 0.1):
         self.temperature = temperature
-        self.vllm_url = VLLM_URL
-        self.api_key = VLLM_API_KEY
+        self.llama_url = LLAMA_SERVER_URL
+        self.api_key = LLAMA_SERVER_API_KEY
         self._client = None
 
     @property
     def client(self) -> Optional[OpenAI]:
         if self._client is None and OpenAI is not None:
             self._client = OpenAI(
-                base_url=self.vllm_url,
+                base_url=self.llama_url,
                 api_key=self.api_key
             )
         return self._client

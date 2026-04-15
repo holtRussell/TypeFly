@@ -50,47 +50,47 @@ def test_image_encoding():
     return True
 
 
-def test_vllm():
-    """Test vLLM connection."""
+def test_llama():
+    """Test llama.cpp server connection."""
     import requests
     
-    vllm_url = os.environ.get("VLLM_URL", "http://localhost:8000/v1")
-    vllm_api_key = os.environ.get("VLLM_API_KEY", "token-abc123")
+    llama_url = os.environ.get("LLAMA_SERVER_URL", "http://localhost:8080/v1")
+    llama_api_key = os.environ.get("LLAMA_SERVER_API_KEY", "token-abc123")
     
     try:
         response = requests.get(
-            f"{vllm_url.rsplit('/v1', 1)[0]}/models",
-            headers={"Authorization": f"Bearer {vllm_api_key}"},
+            f"{llama_url.rsplit('/v1', 1)[0]}/models",
+            headers={"Authorization": f"Bearer {llama_api_key}"},
             timeout=5
         )
         if response.status_code == 200:
-            print("✓ vLLM test passed")
+            print("✓ llama.cpp test passed")
             return True
         else:
-            print(f"ERROR: vLLM returned status {response.status_code}")
+            print(f"ERROR: llama.cpp returned status {response.status_code}")
             return False
     except Exception as e:
-        print(f"ERROR: Cannot connect to vLLM: {e}")
+        print(f"ERROR: Cannot connect to llama.cpp server: {e}")
         return False
 
 
 def test_model():
-    """Test if Gemma3 model is available via vLLM."""
+    """Test if Gemma model is available via llama.cpp server."""
     import requests
     
-    vllm_url = os.environ.get("VLLM_URL", "http://localhost:8000/v1")
-    vllm_api_key = os.environ.get("VLLM_API_KEY", "token-abc123")
+    llama_url = os.environ.get("LLAMA_SERVER_URL", "http://localhost:8080/v1")
+    llama_api_key = os.environ.get("LLAMA_SERVER_API_KEY", "token-abc123")
     
     try:
         response = requests.get(
-            f"{vllm_url.rsplit('/v1', 1)[0]}/models",
-            headers={"Authorization": f"Bearer {vllm_api_key}"},
+            f"{llama_url.rsplit('/v1', 1)[0]}/models",
+            headers={"Authorization": f"Bearer {llama_api_key}"},
             timeout=5
         )
         data = response.json()
         models = [m.get("id", "") for m in data.get("data", [])]
         
-        target_models = ["gemma-4-E2B-it", "gemma-4-e2b-it", "gemma-4-e2b", "gemma-3n-e4b-it"]
+        target_models = ["gemma-4-E2B-it", "gemma-4-e2b", "gemma-4"]
         found = any(tm in models for tm in target_models)
         
         if found:
@@ -98,7 +98,7 @@ def test_model():
             return True
         else:
             print(f"ERROR: Gemma model not found. Available models: {models}")
-            print("Start vLLM with: vllm serve google/gemma-4-E2B-it")
+            print("Start llama.cpp with: make -f Makefile.llama llama_start")
             return False
     except Exception as e:
         print(f"ERROR: Cannot check models: {e}")
@@ -107,13 +107,13 @@ def test_model():
 
 def main():
     print("=" * 50)
-    print("TypeFly vLLM VLM Setup Test")
+    print("TypeFly llama.cpp VLM Setup Test")
     print("=" * 50)
     
     results = []
     results.append(("Camera", test_camera()))
     results.append(("Image Encoding", test_image_encoding()))
-    results.append(("vLLM", test_vllm()))
+    results.append(("llama.cpp", test_llama()))
     results.append(("Model", test_model()))
     
     print("=" * 50)

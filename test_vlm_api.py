@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Test script for vLLM vision API with image file, screen capture, and text prompt."""
+"""Test script for llama.cpp vision API with image file, screen capture, and text prompt."""
 import os
 import sys
 import json
@@ -7,9 +7,9 @@ import base64
 import io
 from PIL import Image
 
-VLLM_URL = os.environ.get("VLLM_URL", "http://localhost:8000/v1")
-VLLM_API_KEY = os.environ.get("VLLM_API_KEY", "token-abc123")
-MODEL = "google/gemma-4-E2B-it"
+LLAMA_SERVER_URL = os.environ.get("LLAMA_SERVER_URL", "http://localhost:8080/v1")
+LLAMA_SERVER_API_KEY = os.environ.get("LLAMA_SERVER_API_KEY", "token-abc123")
+MODEL = "gemma-4-E2B-it"
 
 HAS_TKINTER = False
 try:
@@ -103,8 +103,8 @@ def test_vision_api(image: Image.Image, prompt: str, show_preview: bool = False)
     print(f"   Base64 length: {len(img_str)} chars")
     
     client = OpenAI(
-        base_url=VLLM_URL,
-        api_key=VLLM_API_KEY
+        base_url=LLAMA_SERVER_URL,
+        api_key=LLAMA_SERVER_API_KEY
     )
     
     messages = [
@@ -117,7 +117,7 @@ def test_vision_api(image: Image.Image, prompt: str, show_preview: bool = False)
         }
     ]
     
-    print(f"\n📤 Sending request to {VLLM_URL}")
+    print(f"\n📤 Sending request to {LLAMA_SERVER_URL}")
     print(f"   Model: {MODEL}")
     print(f"   Prompt: {prompt}")
     
@@ -163,7 +163,7 @@ def test_image_scale(image: Image.Image, target_width: int = 320):
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description='Test vLLM vision API')
+    parser = argparse.ArgumentParser(description='Test llama.cpp vision API')
     parser.add_argument('image', nargs='?', help='Path to image file (optional, use --capture instead)')
     parser.add_argument('-p', '--prompt', default='Describe this image in one sentence',
                        help='Prompt to send with the image')

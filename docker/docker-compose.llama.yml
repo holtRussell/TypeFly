@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  llama-server:
+    image: ghcr.io/ggerganov/llama.cpp:metal
+    container_name: typefly-llama
+    ports:
+      - "8080:8080"
+    volumes:
+      - llama-models:/models
+      - ./llama-server.sh:/entrypoint.sh
+    command: >
+      -m /models/gemma-4-E2B-it-Q4_K_M.gguf
+      --host 0.0.0.0
+      --port 8080
+      --parallel 1
+      --slots
+      -c 8192
+      --mmproj /models/mmproj-gemma-4-e2b-it-q4_k_m.gguf
+    environment:
+      - GGML_METAL_ENABLED=1
+    ipc: host
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  llama-models:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/models

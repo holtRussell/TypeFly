@@ -1,0 +1,59 @@
+.PHONY: llama_start llama_stop llama_restart llama_logs llama_status llama_test llama_remove llama_download
+
+COMPOSE_FILE=docker-compose.llama.yml
+CONTAINER_NAME=typefly-llama
+MODEL_REPO=ggml-org/gemma-4-E2B-it-GGUF
+MODEL_Q4=/models/gemma-4-E2B-it-Q4_K_M.gguf
+MODEL_MMPROJ=/models/mmproj-gemma-4-e2b-it-q4_k_m.gguf
+PORT=8080
+
+llama_start:
+	@echo "=> Starting llama.cpp server..."
+	@mkdir -p models
+	docker compose -f $(COMPOSE_FILE) up -d
+	@echo "=> llama.cpp server starting on port $(PORT). Watch logs with: make llama_logs"
+
+llama_stop:
+	@echo "=> Stopping llama.cpp server..."
+	docker compose -f $(COMPOSE_FILE) down
+
+llama_restart:
+	@make llama_stop
+	@make llama_start
+
+llama_logs:
+	docker compose -f $(COMPOSE_FILE) logs -f
+
+llama_status:
+	@echo "=> llama.cpp Container Status:"
+	@docker ps --filter "name=$(CONTAINER_NAME)" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+	@echo ""
+	@echo "=> llama.cpp Models API:"
+	@curl -s http://localhost:$(PORT)/v1/models | python3 -c "import sys,json; d=json.load(sys.stdin); print('\\n'.join(m['id'] for m in d.get('data',[])))" 2>/dev/null || echo "(not responding yet)"
+
+llama_test:
+	@echo "=> Testing llama.cpp API..."
+	@curl -s http://localhost:$(PORT)/v1/models >/dev/null 2>&1 && echo "✓ llama.cpp API responding" || echo "✗ llama.cpp API not responding"
+	@echo ""
+	@echo "=> Testing chat completion..."
+	@curl -s http://localhost:$(PORT)/v1/chat/completions \
+		-H "Content-Type: application/json" \
+		-d '{"model": "gemma-4-E2B-it", "messages": [{"role": "user", "content": "Say hello in 3 words"}], "max_tokens": 20}' \
+		| python3 -c "import sys,json; d=json.load(sys.stdin); print('Response:', d.get('choices',[{}])[0].get('message',{}).get('content','N/A'))" 2>/dev/null || echo "✗ Chat failed"
+
+llama_remove:
+	@echo "=> Removing llama.cpp container..."
+	docker compose -f $(COMPOSE_FILE) down -v
+
+llama_download:
+	@echo "=> Downloading model from HuggingFace..."
+	@mkdir -p models
+	@echo "Downloading Q4_K_M quantized model (~2.5GB)..."
+	@huggingface-cli download $(MODEL_REPO) gemma-4-E2B-it-Q4_K_M.gguf --local-dir models --local-dir-use-symlinks False
+	@echo "Downloading mmproj (multimodal projector)..."
+	@huggingface-cli download $(MODEL_REPO) mmproj-gemma-4-e2b-it-q4_k_m.gguf --local-dir models --local-dir-use-symlinks False
+	@echo "✓ Download complete!"
+
+llama_open:
+	@echo "=> Opening bash in llama.cpp container..."
+	@docker exec -it $(CONTAINER_NAME) bash
