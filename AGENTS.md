@@ -91,7 +91,7 @@ from .utils import print_t
 
 ## Special Notes
 
-- **LLM Integration**: Uses OLLAMA models (Gemma3) via local API at `http://localhost:11434`. Configure with `OLLAMA_URL` environment variable.
+- **LLM Integration**: Uses vLLM with OpenAI-compatible API at `http://localhost:8000/v1`. Configure with `VLLM_URL` and `VLLM_API_KEY` environment variables. Default model: `google/gemma-3-12b-it`.
 - **Vision**: VLM (Gemma3-12b) analyzes raw camera images through two stages:
   1. Scene Analysis: Describes visible objects and layout
   2. Action Decision: Chooses actions based on scene + user instruction

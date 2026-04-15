@@ -1,0 +1,53 @@
+.PHONY: vllm_start vllm_stop vllm_restart vllm_logs vllm_status vllm_test vllm_remove
+
+COMPOSE_FILE=docker-compose.vllm.yml
+CONTAINER_NAME=typefly-vllm
+MODEL_NAME=google/gemma-3-12b-it
+PORT=8000
+
+GPU_DEVICES=0
+GPU_OPTIONS=$(shell if [ -f /proc/driver/nvidia/version ]; then echo "--gpus all"; else echo ""; endif)
+
+vllm_start:
+	@echo "=> Starting vLLM container..."
+	docker compose -f $(COMPOSE_FILE) up -d
+	@echo "=> vLLM starting on port $(PORT). Watch logs with: make vllm_logs"
+
+vllm_stop:
+	@echo "=> Stopping vLLM container..."
+	docker compose -f $(COMPOSE_FILE) down
+
+vllm_restart:
+	@make vllm_stop
+	@make vllm_start
+
+vllm_logs:
+	docker compose -f $(COMPOSE_FILE) logs -f
+
+vllm_status:
+	@echo "=> vLLM Container Status:"
+	@docker ps --filter "name=$(CONTAINER_NAME)" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+	@echo ""
+	@echo "=> vLLM Models:"
+	@curl -s http://localhost:$(PORT)/v1/models \
+		-H "Authorization: Bearer token-abc123" | python3 -c "import sys,json; d=json.load(sys.stdin); print('\\n'.join(m['id'] for m in d.get('data',[])))" 2>/dev/null || echo "(not responding yet)"
+
+vllm_test:
+	@echo "=> Testing vLLM API..."
+	@curl -s http://localhost:$(PORT)/v1/models \
+		-H "Authorization: Bearer token-abc123" >/dev/null 2>&1 && echo "✓ vLLM API responding" || echo "✗ vLLM API not responding"
+	@echo ""
+	@echo "=> Testing chat completion..."
+	@curl -s http://localhost:$(PORT)/v1/chat/completions \
+		-H "Content-Type: application/json" \
+		-H "Authorization: Bearer token-abc123" \
+		-d '{"model": "$(MODEL_NAME)", "messages": [{"role": "user", "content": "Say hello in 3 words"}], "max_tokens": 20}' \
+		| python3 -c "import sys,json; d=json.load(sys.stdin); print('Response:', d.get('choices',[{}])[0].get('message',{}).get('content','N/A'))" 2>/dev/null || echo "✗ Chat failed"
+
+vllm_remove:
+	@echo "=> Removing vLLM container and volume..."
+	docker compose -f $(COMPOSE_FILE) down -v
+
+vllm_open:
+	@echo "=> Opening bash in vLLM container..."
+	@docker exec -it $(CONTAINER_NAME) bash

@@ -16,7 +16,7 @@ _USER_LOG_QUEUE = queue.Queue()
 
 class AgentLoop:
     """
-    Agent loop with tool calling support for Ollama.
+    Agent loop with tool calling support for vLLM.
     Manages message history and tool execution loop.
     """
     
@@ -27,10 +27,10 @@ class AgentLoop:
         self.messages: list[dict] = []
         self.context: Optional[list] = None
         self.max_tool_calls = 10
-        self._tool_map: dict[str, SkillItem] = {}
+        self._tool_map: dict[str, SkillItem] = []
         
     def register_tools(self, skillset) -> list[dict]:
-        """Register skills as Ollama tools and return tool definitions"""
+        """Register skills as vLLM tools and return tool definitions"""
         tools = []
         for skill_name, skill_item in skillset.skills.items():
             tool_def = skill_item.to_ollama_tool()

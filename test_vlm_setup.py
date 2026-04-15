@@ -4,6 +4,7 @@ import os
 import cv2
 from PIL import Image
 
+
 def test_camera():
     """Test if camera is accessible."""
     cap = cv2.VideoCapture(0)
@@ -21,6 +22,7 @@ def test_camera():
     print("✓ Camera test passed")
     return True
 
+
 def test_image_encoding():
     """Test image encoding for VLM."""
     cap = cv2.VideoCapture(0)
@@ -31,17 +33,14 @@ def test_image_encoding():
         print("ERROR: Failed to capture image")
         return False
     
-    # Convert to PIL Image
     image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     
-    # Downscale (as VLM does)
     target_width = 320
     w, h = image.size
     if w > target_width:
         scale = target_width / w
         image = image.resize((target_width, int(h * scale)), Image.LANCZOS)
     
-    # Encode to base64
     import io, base64
     buffered = io.BytesIO()
     image.save(buffered, format="JPEG")
@@ -50,51 +49,71 @@ def test_image_encoding():
     print(f"✓ Image encoding test passed ({len(img_str)} base64 chars)")
     return True
 
-def test_ollama():
-    """Test OLLAMA connection."""
+
+def test_vllm():
+    """Test vLLM connection."""
     import requests
     
+    vllm_url = os.environ.get("VLLM_URL", "http://localhost:8000/v1")
+    vllm_api_key = os.environ.get("VLLM_API_KEY", "token-abc123")
+    
     try:
-        response = requests.get("http://localhost:11434", timeout=5)
+        response = requests.get(
+            f"{vllm_url.rsplit('/v1', 1)[0]}/models",
+            headers={"Authorization": f"Bearer {vllm_api_key}"},
+            timeout=5
+        )
         if response.status_code == 200:
-            print("✓ OLLAMA test passed")
+            print("✓ vLLM test passed")
             return True
         else:
-            print(f"ERROR: OLLAMA returned status {response.status_code}")
+            print(f"ERROR: vLLM returned status {response.status_code}")
             return False
     except Exception as e:
-        print(f"ERROR: Cannot connect to OLLAMA: {e}")
+        print(f"ERROR: Cannot connect to vLLM: {e}")
         return False
 
+
 def test_model():
-    """Test if Gemma3N model is available."""
+    """Test if Gemma3 model is available via vLLM."""
     import requests
     
+    vllm_url = os.environ.get("VLLM_URL", "http://localhost:8000/v1")
+    vllm_api_key = os.environ.get("VLLM_API_KEY", "token-abc123")
+    
     try:
-        response = requests.get("http://localhost:11434/api/tags", timeout=5)
+        response = requests.get(
+            f"{vllm_url.rsplit('/v1', 1)[0]}/models",
+            headers={"Authorization": f"Bearer {vllm_api_key}"},
+            timeout=5
+        )
         data = response.json()
-        models = [m.get("name", "") for m in data.get("models", [])]
+        models = [m.get("id", "") for m in data.get("data", [])]
         
-        if "gemma3n:e4b" in models:
-            print("✓ Gemma3N model found")
+        target_models = ["gemma-3-12b-it", "gemma-3-4b-it", "gemma3:12b"]
+        found = any(tm in models for tm in target_models)
+        
+        if found:
+            print(f"✓ Gemma3 model found: {[m for m in models if 'gemma' in m.lower()]}")
             return True
         else:
-            print(f"ERROR: gemma3n:e4b not found. Available models: {models}")
-            print("Run: ollama pull gemma3n:e4b")
+            print(f"ERROR: Gemma3 model not found. Available models: {models}")
+            print("Start vLLM with: vllm serve google/gemma-3-12b-it")
             return False
     except Exception as e:
         print(f"ERROR: Cannot check models: {e}")
         return False
 
+
 def main():
     print("=" * 50)
-    print("TypeFly VLM Setup Test")
+    print("TypeFly vLLM VLM Setup Test")
     print("=" * 50)
     
     results = []
     results.append(("Camera", test_camera()))
     results.append(("Image Encoding", test_image_encoding()))
-    results.append(("OLLAMA", test_ollama()))
+    results.append(("vLLM", test_vllm()))
     results.append(("Model", test_model()))
     
     print("=" * 50)
@@ -113,6 +132,7 @@ def main():
         print("✗ Some tests failed. Please fix before running.")
     
     return all_passed
+
 
 if __name__ == "__main__":
     import sys

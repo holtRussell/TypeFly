@@ -1,0 +1,34 @@
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: typefly-vllm
+    ports:
+      - "8000:8000"
+    volumes:
+      - vllm-cache:/root/.cache/huggingface
+    environment:
+      - VLLM_USE_CPU_ONLY=1
+    env_file:
+      - ./env.vllm.list
+    command: >
+      --model google/gemma-3-12b-it
+      --max-model-len 4096
+      --gpu-memory-utilization 0.9
+      --host 0.0.0.0
+      --port 8000
+      --api-key token-abc123
+      --dtype auto
+
+    ipc: host
+    shm_size: "16g"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  vllm-cache:
+    name: typefly-vllm-cache

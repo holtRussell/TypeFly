@@ -52,8 +52,8 @@ class SkillItem(ABC):
     def __repr__(self) -> str:
         return f"name: {self._name}, description: {self._description}, args: {[arg for arg in self._args]}"
 
-    def to_ollama_tool(self) -> dict[str, Any]:
-        """Convert SkillItem to Ollama tool format"""
+    def to_tool(self) -> dict[str, Any]:
+        """Convert SkillItem to OpenAI/vLLM tool format"""
         properties: Dict[str, Any] = {}
         required: List[str] = []
         
@@ -79,3 +79,7 @@ class SkillItem(ABC):
                 }
             }
         }
+    
+    def to_ollama_tool(self) -> dict[str, Any]:
+        """Alias for to_tool() for backward compatibility."""
+        return self.to_tool()
