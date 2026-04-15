@@ -6,12 +6,10 @@ services:
       - "8000:8000"
     volumes:
       - vllm-cache:/root/.cache/huggingface
-    environment:
-      - VLLM_USE_CPU_ONLY=1
     env_file:
       - ./env.vllm.list
     command: >
-      --model google/gemma-3-12b-it
+      --model google/gemma-3n-e4b-it
       --max-model-len 4096
       --gpu-memory-utilization 0.9
       --host 0.0.0.0

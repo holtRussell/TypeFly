@@ -2,7 +2,7 @@
 
 COMPOSE_FILE=docker-compose.vllm.yml
 CONTAINER_NAME=typefly-vllm
-MODEL_NAME=google/gemma-3-12b-it
+MODEL_NAME=google/gemma-3n-e4b-it
 PORT=8000
 
 GPU_DEVICES=0

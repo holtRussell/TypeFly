@@ -90,15 +90,15 @@ def test_model():
         data = response.json()
         models = [m.get("id", "") for m in data.get("data", [])]
         
-        target_models = ["gemma-3-12b-it", "gemma-3-4b-it", "gemma3:12b"]
+        target_models = ["gemma-3n-e4b-it", "gemma-3n-e4b", "gemma3n:e4b", "gemma-3-12b-it"]
         found = any(tm in models for tm in target_models)
         
         if found:
-            print(f"✓ Gemma3 model found: {[m for m in models if 'gemma' in m.lower()]}")
+            print(f"✓ Gemma3n model found: {[m for m in models if 'gemma' in m.lower()]}")
             return True
         else:
-            print(f"ERROR: Gemma3 model not found. Available models: {models}")
-            print("Start vLLM with: vllm serve google/gemma-3-12b-it")
+            print(f"ERROR: Gemma3n model not found. Available models: {models}")
+            print("Start vLLM with: vllm serve google/gemma-3n-e4b-it")
             return False
     except Exception as e:
         print(f"ERROR: Cannot check models: {e}")
