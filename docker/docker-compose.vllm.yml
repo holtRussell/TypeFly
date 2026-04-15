@@ -9,7 +9,7 @@ services:
     env_file:
       - ./env.vllm.list
     command: >
-      --model google/gemma-3n-e4b-it
+      --model google/gemma-4-E2B-it
       --max-model-len 4096
       --gpu-memory-utilization 0.9
       --host 0.0.0.0

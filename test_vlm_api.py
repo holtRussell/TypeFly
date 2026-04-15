@@ -9,7 +9,7 @@ from PIL import Image
 
 VLLM_URL = os.environ.get("VLLM_URL", "http://localhost:8000/v1")
 VLLM_API_KEY = os.environ.get("VLLM_API_KEY", "token-abc123")
-MODEL = "google/gemma-3n-e4b-it"
+MODEL = "google/gemma-4-E2B-it"
 
 HAS_TKINTER = False
 try:

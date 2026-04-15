@@ -17,8 +17,8 @@ class ModelType(Enum):
     LLAMA3_70B = "meta-llama/Meta-Llama-3-70B-Instruct"
     LLAMA3_1 = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     LLAMA3_2 = "meta-llama/Meta-Llama-3.2-8B-Instruct"
-    GEMMA3N = "google/gemma-3n-e4b-it"
-    GEMMA3 = "google/gemma-3n-e4b-it"
+    GEMMA3N = "google/gemma-4-E2B-it"
+    GEMMA3 = "google/gemma-4-E2B-it"
 
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
