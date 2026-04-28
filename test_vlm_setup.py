@@ -59,23 +59,23 @@ def test_vllm():
     
     try:
         response = requests.get(
-            f"{vllm_url.rsplit('/v1', 1)[0]}/models",
+            f"{vllm_url}/models",
             headers={"Authorization": f"Bearer {vllm_api_key}"},
             timeout=5
         )
         if response.status_code == 200:
-            print("✓ vLLM test passed")
+            print("✓ MLX-VLM test passed")
             return True
         else:
-            print(f"ERROR: vLLM returned status {response.status_code}")
+            print(f"ERROR: MLX-VLM returned status {response.status_code}")
             return False
     except Exception as e:
-        print(f"ERROR: Cannot connect to vLLM: {e}")
+        print(f"ERROR: Cannot connect to MLX-VLM: {e}")
         return False
 
 
 def test_model():
-    """Test if Gemma3 model is available via vLLM."""
+    """Test if Gemma model is available via MLX-VLM."""
     import requests
     
     vllm_url = os.environ.get("VLLM_URL", "http://localhost:8000/v1")
@@ -83,22 +83,22 @@ def test_model():
     
     try:
         response = requests.get(
-            f"{vllm_url.rsplit('/v1', 1)[0]}/models",
+            f"{vllm_url}/models",
             headers={"Authorization": f"Bearer {vllm_api_key}"},
             timeout=5
         )
         data = response.json()
         models = [m.get("id", "") for m in data.get("data", [])]
         
-        target_models = ["gemma-4-E2B-it", "gemma-4-e2b-it", "gemma-4-e2b", "gemma-3n-e4b-it"]
-        found = any(tm in models for tm in target_models)
+        target_models = ["gemma-4-e4b-it-4bit", "gemma-3n-E2B-it-4bit", "gemma-4-e4b"]
+        found = any(m for m in models if any(tm in m for tm in target_models))
         
         if found:
             print(f"✓ Gemma model found: {[m for m in models if 'gemma' in m.lower()]}")
             return True
         else:
             print(f"ERROR: Gemma model not found. Available models: {models}")
-            print("Start vLLM with: vllm serve google/gemma-4-E2B-it")
+            print("Start MLX-VLM with: mlx_vlm.server --model mlx-community/gemma-4-e4b-it-4bit --port 8000")
             return False
     except Exception as e:
         print(f"ERROR: Cannot check models: {e}")
@@ -107,7 +107,7 @@ def test_model():
 
 def main():
     print("=" * 50)
-    print("TypeFly vLLM VLM Setup Test")
+    print("TypeFly MLX-VLM Setup Test")
     print("=" * 50)
     
     results = []

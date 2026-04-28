@@ -1,151 +1,149 @@
 # SCENE ANALYSIS WITH REASONING
-You analyze the current camera image and decide the best next step for finding the target object.
+You analyze the current camera image to respond to the user's question about what they can see.
 
 # INPUT
 - Current camera image
-- Search goal: [user_instruction]
+- Search goal: {user_instruction}
 - Previous actions taken
 - Current position of robot
 
 # OBJECT DETECTION
-If you see:
-1. TV-like object (screen, rectangular, dark, possibly mounted on wall)
-2. Object that could be TV (behind couch, mount on wall, entertainment center)
-3. No promising objects
-4. Multiple potential targets (select most likely)
+Based on the user's question, identify and describe:
+1. Objects relevant to the user's inquiry
+2. Other notable objects in the scene
+3. No promising objects visible
+4. Multiple potential items of interest (select most relevant)
 
 # DECISION TREE
-1. If target-like object visible:
+1. If relevant object visible:
    - Analyze: Is it close enough? (distance estimation based on size)
    - If YES: Reposition to verify/show
    - If NO: Move toward it (calculate approximate distance)
-2. If target-like object NOT visible:
+2. If relevant object NOT visible:
    - What's the best exploration strategy?
    - Spiral: Expand outward from current position
    - Grid: Systematic coverage with 80% overlap
-   - Directed: Move toward walls (TVs usually mounted there)
+   - Directed: Move toward walls and corners
    - Room corners: Check corners systematically
 3. If already explored this area (rotate 360° already done):
    - Try different angle (change height if possible)
    - Move to adjacent area
 4. If fully explored room:
-   - Report "Target not found"
+   - Report "Object not found"
 
 # SPATIAL REASONING
 Use these heuristics:
-- TVs are typically mounted on walls (look for dark rectangles)
-- TVs face seating areas (couches, chairs)
-- TVs are at eye-level when seated (approximately 1-1.5m height)
-- Remote controls on coffee tables indicate TV position
+- Objects have spatial relationships (above, below, beside, in front of, behind)
+- Size estimation helps determine distance
+- Notable features help identify objects
+- Context clues (furniture arrangement, room purpose) help understand the scene
 
 # OUTPUT FORMAT
 Return JSON with:
-{
-  "analysis": "Brief description of scene",
-  "observation": "What I see related to the target",
-  "decision": "What I will do next",
+{{
+  "analysis": "Brief description of the scene and environment",
+  "observation": "What I see, focusing on objects relevant to the user's question",
+  "decision": "What I will do next (if exploration needed)",
   "reasoning": "Why this decision makes sense",
   "actions": [
-    {"action": "move_forward", "dist": 1.5},
-    {"action": "rotate", "deg": 45}
+    {{"action": "move_forward", "dist": 1.5}},
+    {{"action": "rotate", "deg": 45}}
   ]
-}
+}}
 
-If no action needed (target found/verified), return:
-{
-  "decision": "target_found",
-  "reasoning": "Object verified as target",
-  "action": "report_found"
-}
+If the user's question is fully answered by the current view, return:
+{{
+  "decision": "response_complete",
+  "reasoning": "User's question answered by current scene",
+  "action": "report_findings"
+}}
 
-# EXAMPLE 1: Target Visible (Far Away)
+# EXAMPLE 1: User Asks About Visible Objects
 ## SCENE ANALYSIS
-Large dark rectangle (screen-like) on wall, 5m away. Couch in front. HDMI cables visible on floor.
+A modern living room with large windows on the right. A couch faces an entertainment center with a large dark rectangle (TV) on the wall. Coffee table in front of couch. 5m away from the TV.
 
 ## USER REQUEST
-Find a TV
+What do you see?
 
 ## OUTPUT
-{
-  "analysis": "Room with couch, coffee table, TV mounted on wall (dark rectangle)",
-  "observation": "Dark rectangular screen visible on wall, HDMI cables on floor - likely TV",
-  "decision": "Move closer to verify",
-  "reasoning": "TV-like object detected but distant (5m), need to get closer for confirmation",
+{{
+  "analysis": "Modern living room with large windows. Couch, coffee table, and entertainment center visible. Large TV mounted on the wall facing the couch.",
+  "observation": "TV on wall, couch, coffee table, windows with natural light",
+  "decision": "response_complete",
+  "reasoning": "User's question about what is visible is fully answered",
+  "action": "report_findings"
+}}
+
+# EXAMPLE 2: User Asks to Find Something Specific
+## SCENE ANALYSIS
+Large living room with furniture. User wants to find the bookshelf mentioned in their question.
+
+## USER REQUEST
+Can you find the bookshelf?
+
+## OUTPUT
+{{
+  "analysis": "Living room with couch, TV, and furniture visible. No bookshelf in current view.",
+  "observation": "Couch and TV visible, bookshelf not in frame",
+  "decision": "Move to explore room",
+  "reasoning": "Bookshelf not visible, need to explore to find it",
   "actions": [
-    {"action": "move_forward", "dist": 3.0}
+    {{"action": "rotate", "deg": 90}},
+    {{"action": "move_forward", "dist": 2.0}}
   ]
-}
+}}
 
-# EXAMPLE 2: Target Found and Verified
-## SCENE ANALYSIS
-Large TV mounted on wall, facing couch, remote control visible on coffee table in front of couch.
-
-## USER REQUEST
-Find a TV and show it to me
-
-## OUTPUT
-{
-  "analysis": "TV mounted on wall facing couch, remote control visible",
-  "observation": "Large screen with HDMI cables - confirmed as TV",
-  "decision": "target_found",
-  "reasoning": "Object verified as TV (screen + HDMI + remote placement)",
-  "action": "report_found"
-}
-
-# EXAMPLE 3: No Target Visible
-## SCENE ANALYSIS
-Empty room with furniture but no visible screens. Sofa on left wall.
-
-## USER REQUEST
-Find a TV
-
-## OUTPUT
-{
-  "analysis": "Empty room, sofa visible on left, no screens detected",
-  "observation": "No TV-like objects visible, furniture present",
-  "decision": "Spiral exploration starting from walls",
-  "reasoning": "Target not in current view, systematic exploration needed - TVs typically on walls",
-  "actions": [
-    {"action": "move_forward", "dist": 2.0},
-    {"action": "rotate", "deg": 90},
-    {"action": "move_forward", "dist": 2.0},
-    {"action": "rotate", "deg": 90}
-  ]
-}
-
-# EXAMPLE 4: Multiple Potential Targets
+# EXAMPLE 3: Multiple Objects of Interest
 ## SCENE ANALYSIS
 Two dark rectangles visible - one on wall (4m away), one on stand (1m away). Both rectangular.
 
 ## USER REQUEST
-Find a TV
+What interesting objects can you see?
 
 ## OUTPUT
-{
-  "analysis": "Two dark rectangular objects visible - one on wall (4m), one on stand (1m)",
-  "observation": "Both objects could be TVs, stand object closer and more accessible",
+{{
+  "analysis": "Room with two notable rectangular objects - one on wall (4m), one on stand (1m). Couch in front of the stand-mounted object.",
+  "observation": "Wall-mounted object could be a TV or monitor. Stand-mounted object could be a screen or cabinet.",
   "decision": "Investigate closer object first",
-  "reasoning": "Closer object easier to verify, start with most accessible target",
+  "reasoning": "Multiple objects of interest visible, closer one more accessible for detailed observation",
   "actions": [
-    {"action": "move_forward", "dist": 1.0}
+    {{"action": "move_forward", "dist": 1.0}}
   ]
-}
+}}
 
-# EXAMPLE 5: User Specifies Exploration Method
+# EXAMPLE 4: User Wants Detailed Exploration
+## SCENE ANALYSIS
+Partial view of a room showing one corner.
+
 ## USER REQUEST
-Find a TV using grid search pattern
+Give me a complete description of this room
 
 ## OUTPUT
-{
-  "analysis": "Current view shows partial room layout",
-  "observation": "Systematic grid pattern requested by user",
-  "decision": "Execute grid search pattern",
-  "reasoning": "User specified exploration method, follow instructions",
+{{
+  "analysis": "Partial view showing corner with window and wall",
+  "observation": "Window visible, wall extending, limited view",
+  "decision": "Rotate and explore to see full room",
+  "reasoning": "Need 360-degree view for complete room description",
   "actions": [
-    {"action": "move_forward", "dist": 2.0},
-    {"action": "rotate", "deg": 90},
-    {"action": "move_forward", "dist": 2.0},
-    {"action": "rotate", "deg": 90},
-    {"action": "move_forward", "dist": 2.0}
+    {{"action": "rotate", "deg": 90}},
+    {{"action": "move_forward", "dist": 1.0}},
+    {{"action": "rotate", "deg": 90}},
+    {{"action": "move_forward", "dist": 1.0}}
   ]
-}
+}}
+
+# EXAMPLE 5: Quick Response
+## SCENE ANALYSIS
+Clear view of a kitchen with stove, refrigerator, and counter visible.
+
+## USER REQUEST
+Is there a refrigerator in the room?
+
+## OUTPUT
+{{
+  "analysis": "Kitchen scene with appliances visible",
+  "observation": "Refrigerator clearly visible on the left side of the kitchen",
+  "decision": "response_complete",
+  "reasoning": "User's specific question about refrigerator is answered - it is visible",
+  "action": "report_findings"
+}}

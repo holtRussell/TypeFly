@@ -17,7 +17,7 @@ class VLMPlanner:
         self.robot = robot
         self.model_type = model_type
 
-        assets_path = os.path.join(CURRENT_PROJ_DIR, f"./assets")
+        assets_path = os.path.join(CURRENT_PROJ_DIR, "assets")
         with open(os.path.join(assets_path, "prompt_vlm_stage1_scene.txt"), "r") as f:
             self.prompt_scene_stage1 = f.read()
         with open(os.path.join(assets_path, "prompt_vlm_stage2_action.txt"), "r") as f:
@@ -44,7 +44,8 @@ class VLMPlanner:
             robot_skills=str(self.robot.skillset)
         )
         
-        scene_description = self.llm.request_multimodal(prompt, scaled_image, self.model_type)
+        response = self.llm.request_multimodal(prompt, scaled_image, self.model_type)
+        scene_description = response[0] if isinstance(response, tuple) else response
         return scene_description.strip()
 
     def plan_action(self, user_instruction: str, scene_description: str, image: Image.Image) -> str:
@@ -56,7 +57,8 @@ class VLMPlanner:
             scene_context=scene_description
         )
         
-        return self.llm.request_multimodal(prompt, scaled_image, self.model_type)
+        response = self.llm.request_multimodal(prompt, scaled_image, self.model_type)
+        return response[0] if isinstance(response, tuple) else response
 
     def describe_scene_vlm_with_target(self, image: Image.Image, target_object: str) -> str:
         scaled_image = self._scale_image(image)
@@ -89,7 +91,8 @@ If the object is visible, you MUST respond with [YES] at the start of your respo
 If the object is not visible, you MUST respond with [NO] at the start of your response."""
         
         prompt = prompt_template.format(target_object=target_object)
-        scene_description = self.llm.request_multimodal(prompt, scaled_image, self.model_type)
+        response = self.llm.request_multimodal(prompt, scaled_image, self.model_type)
+        scene_description = response[0] if isinstance(response, tuple) else response
         return scene_description.strip()
 
     def plan_with_target(self, user_instruction: str, target_object: str, image=None) -> str:
@@ -115,7 +118,7 @@ If the object is not visible, you MUST respond with [NO] at the start of your re
 
         scaled_image = self._scale_image(image)
         
-        assets_path = os.path.join(CURRENT_PROJ_DIR, f"./assets")
+        assets_path = os.path.join(CURRENT_PROJ_DIR, "assets")
         with open(os.path.join(assets_path, "prompt_exploration_reasoning.txt"), "r") as f:
             prompt_reasoning = f.read()
         
@@ -123,10 +126,15 @@ If the object is not visible, you MUST respond with [NO] at the start of your re
         
         response = self.llm.request_multimodal(prompt, scaled_image, self.model_type)
         
-        print_t(f"[VLM] Reasoning response: {response}")
+        if isinstance(response, tuple):
+            response_text = response[0] if response else ""
+        else:
+            response_text = response
+        
+        print_t(f"[VLM] Reasoning response: {response_text}")
         
         try:
-            response_clean = response.strip()
+            response_clean = response_text.strip()
             if response_clean.startswith('```json'):
                 response_clean = response_clean[7:]
             if response_clean.startswith('```'):
@@ -172,7 +180,8 @@ Respond with ONLY: [YES], [NO], or [UNCLEAR]"""
         
         try:
             response = self.llm.request_multimodal(prompt, scaled_image, self.model_type)
-            response_lower = response.strip().lower()
+            response_text = response[0] if isinstance(response, tuple) else response
+            response_lower = response_text.strip().lower()
             
             is_found = "[yes]" in response_lower or response_lower.startswith("yes")
             confirmation_msg = f"Verified: {target_object} is visible" if is_found else f"Not verified: {target_object} not confirmed"
@@ -227,7 +236,8 @@ If object is on the right side:
         try:
             response = self.llm.request_multimodal(prompt, scaled_image, self.model_type)
             
-            response_clean = response.strip()
+            response_text = response[0] if isinstance(response, tuple) else response
+            response_clean = response_text.strip()
             if response_clean.startswith('```json'):
                 response_clean = response_clean[7:]
             if response_clean.startswith('```'):
@@ -390,92 +400,3 @@ If object is on the right side:
         else:
             print_t(f"[VLM] Unknown action: {action_body}")
             return False, False
-
-    def execute_action(self, action_text: str, image: Image.Image = None) -> tuple[bool, bool]:
-        import time
-        from .skill_item import SkillItem
-
-        action_line = action_text.strip()
-        print_t(f"[VLM] Raw action: {action_line}")
-
-        if not action_line:
-            return False
-
-        match = re.match(r'\[ACTION\]\s*(.+)', action_line)
-        if match:
-            action_body = match.group(1).strip()
-        else:
-            action_body = action_line
-
-        action_lower = action_body.lower()
-
-        skills = self.robot.skillset.skills
-
-        if 'move forward' in action_lower:
-            match = re.search(r'(\d+(?:\.\d+)?)\s*(m|meter|metre)?', action_body)
-            dist = float(match.group(1)) if match else 1.0
-            self.robot.move_forward(dist)
-        elif 'move backward' in action_lower or 'move back' in action_lower:
-            match = re.search(r'(\d+(?:\.\d+)?)\s*(m|meter|metre)?', action_body)
-            dist = float(match.group(1)) if match else 1.0
-            self.robot.move_backward(dist)
-        elif 'move left' in action_lower:
-            match = re.search(r'(\d+(?:\.\d+)?)\s*(m|meter|metre)?', action_body)
-            dist = float(match.group(1)) if match else 1.0
-            self.robot.move_left(dist)
-        elif 'move right' in action_lower:
-            match = re.search(r'(\d+(?:\.\d+)?)\s*(m|meter|metre)?', action_body)
-            dist = float(match.group(1)) if match else 1.0
-            self.robot.move_right(dist)
-        elif 'rotate left' in action_lower or 'turn left' in action_lower:
-            match = re.search(r'(\d+)', action_body)
-            deg = int(match.group(1)) if match else 45
-            self.robot.rotate_left(deg)
-        elif 'rotate right' in action_lower or 'turn right' in action_lower:
-            match = re.search(r'(\d+)', action_body)
-            deg = int(match.group(1)) if match else 45
-            self.robot.rotate_right(deg)
-        elif 'move up' in action_lower or 'lift' in action_lower:
-            match = re.search(r'(\d+(?:\.\d+)?)\s*(m|meter|metre|cm)?', action_body)
-            if match:
-                val = float(match.group(1))
-                unit = match.group(2)
-                if unit and 'cm' in unit:
-                    dist = val / 100.0
-                else:
-                    dist = val
-            else:
-                dist = 1.0
-            if hasattr(self.robot, 'lift'):
-                self.robot.lift(dist * 100)
-            else:
-                self.robot.move_forward(dist)
-        elif 'move down' in action_lower or 'land' in action_lower:
-            print_t("[VLM] Move down command received")
-        elif 'stop' in action_lower or 'hover' in action_lower or 'wait' in action_lower:
-            time.sleep(2.0)
-        elif 'scan for' in action_lower:
-            match = re.search(r'([a-zA-Z0-9\s]+?)(?:\bat\b|$)', action_body, re.IGNORECASE)
-            object_desc = match.group(1).strip() if match else ""
-            if object_desc:
-                self.robot.scan_for_object(object_desc)
-            else:
-                print_t("[VLM] No object description in scan command")
-                return False
-        elif 'scan' in action_lower:
-            self.robot.scan_for_object("object")
-        elif 'describe' in action_lower or 'observation' in action_lower:
-            current_image = self.robot.obs.image
-            if current_image:
-                scene_description = self.describe_scene_vlm(current_image)
-                self.robot.log(scene_description)
-            else:
-                self.robot.log("I cannot see any image from my camera.")
-        elif action_lower.startswith('log '):
-            message = action_body[4:]
-            self.robot.log(message)
-        else:
-            print_t(f"[VLM] Unknown action: {action_body}")
-            return False
-
-        return True

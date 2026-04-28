@@ -32,14 +32,21 @@ To control a Unitree Go2 robot dog, install ROS2 and run the [go2_ros2_sdk](http
 ### Other Robots
 Implement robot control interface based on `RobotWrapper` (see `typefly/platforms/*`).
 
-## 3. OLLAMA API Requirement
+## 3. MLX-VLM Requirement
 
-TypeFly uses OLLAMA as the local VLM planner. Connects to `http://localhost:11434` by default. Configure via `OLLAMA_URL` environment variable.
+TypeFly uses MLX-VLM as the local VLM planner, optimized for Apple Silicon (M-series chips).
 
-### Pull the VLM Model
+### Install MLX-VLM
 ```bash
-ollama pull gemma3:12b
+pip install git+https://github.com/waybarrios/vllm-mlx.git
 ```
+
+### Start MLX-VLM Server
+```bash
+vllm-mlx serve mlx-community/gemma-4-e4b-it-4bit --port 8000
+```
+
+The server exposes an OpenAI-compatible API at `http://localhost:8000/v1`.
 
 ## 4. Configuration
 

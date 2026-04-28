@@ -12,7 +12,7 @@ class LLMPlanner():
         self.robot = robot
         self.model_type = model_type
 
-        assets_path = os.path.join(CURRENT_PROJ_DIR, f"./assets")
+        assets_path = os.path.join(CURRENT_PROJ_DIR, "assets")
         with open(os.path.join(assets_path, "prompt_plan.txt"), "r") as f:
             self.prompt_plan = f.read()
         with open(os.path.join(assets_path, "prompt_probe.txt"), "r") as f:

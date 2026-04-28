@@ -3,7 +3,8 @@
 ## Prerequisites
 
 1. **Python 3.10+**
-2. **OLLAMA** installed and running on port 11434
+2. **Docker** installed and running (for vLLM)
+3. **Webcam** (for virtual mode)
 
 ## Installation
 
@@ -18,16 +19,25 @@ cd TypeFly
 pip install -e .
 ```
 
-## Step 1: Start OLLAMA
+## Step 1: Start vLLM
 
-Make sure OLLAMA is running and pull the Gemma3N model:
+vLLM runs as a Docker container and hosts the Gemma3-12b vision model.
 
 ```bash
-# Check if OLLAMA is running
-curl http://localhost:11434
+# Start vLLM container (runs on port 8000)
+make vllm_start
 
-# Pull Gemma3N model (required for VLM)
-ollama pull gemma3n:e4b
+# Watch logs until ready (look for "Uvicorn running on http://0.0.0.0:8000")
+make vllm_logs
+
+# Verify vLLM is running
+curl http://localhost:8000/v1/models
+```
+
+Alternatively, run vLLM locally:
+```bash
+pip install vllm
+vllm serve google/gemma-3-12b-it --port 8000
 ```
 
 ## Step 2: Verify Setup (Recommended)
@@ -42,7 +52,7 @@ You should see:
 ```
 ✓ Camera: PASS
 ✓ Image Encoding: PASS
-✓ OLLAMA: PASS
+✓ vLLM: PASS
 ✓ Model: PASS
 ```
 
@@ -101,7 +111,7 @@ TypeFly runs in `virtual` mode by default, using your webcam for vision.
 ## How It Works
 
 1. **Camera Frame** → Virtual robot captures webcam feed at 10 FPS
-2. **VLM Analysis** → Gemma3N model analyzes the image and decides actions
+2. **VLM Analysis** → Gemma3-12b model analyzes the image and decides actions
 3. **Action Execution** → Virtual robot simulates movement responses
 
 **No YOLO server needed!** The VLM directly processes images.
@@ -110,7 +120,7 @@ TypeFly runs in `virtual` mode by default, using your webcam for vision.
 
 | Service | Port | Purpose |
 |---------|------|---------|
-| OLLAMA | 11434 | VLM (Gemma3N for vision + control) |
+| vLLM | 8000 | VLM (Gemma3-12b for vision + control) |
 | Web UI | 50000 | User interface with video feed |
 
 **No separate YOLO server required** - the VLM processes raw images directly.
@@ -118,40 +128,51 @@ TypeFly runs in `virtual` mode by default, using your webcam for vision.
 ## Troubleshooting
 
 **No video feed?**
-- ✓ Check camera permissions in OS settings
-- ✓ Verify camera works in other applications
-- ✓ Open `http://localhost:50000/robot-pov/` directly in browser
+- Check camera permissions in OS settings
+- Verify camera works in other applications
+- Open `http://localhost:50000/robot-pov/` directly in browser
 
 **Commands not executing?**
-- ✓ Ensure Gemma3N model is pulled: `ollama pull gemma3n:e4b`
-- ✓ Check OLLAMA is running on port 11434
-- ✓ Wait a few seconds for the model to load on first request
+- Ensure vLLM is running: `make vllm_status`
+- Check vLLM logs: `make vllm_logs`
+- Wait a few seconds for the model to load on first request
 
-**VLM slow to respond?**
-- ✓ First request takes longer (model loading)
-- ✓ Subsequent requests should be faster
-- ✓ Consider using GPU if available
+**vLLM slow to respond?**
+- First request takes longer (model loading)
+- Subsequent requests should be faster
+- Consider using GPU if available
 
 **Web UI doesn't start?**
-- ✓ Kill existing processes: `pkill -f "typefly.webui"`
-- ✓ Check if port 50000 is available
-- ✓ Watch terminal output for errors
+- Kill existing processes: `pkill -f "typefly.webui"`
+- Check if port 50000 is available
+- Watch terminal output for errors
 
 **"Failed to open camera" error?**
-- ✓ Check camera device index (default: 0)
-- ✓ Try `capture: 1` or `capture: 2` in `typefly/config/robot_info.json`
-- ✓ Verify camera works in other apps
+- Check camera device index (default: 0)
+- Try `capture: 1` or `capture: 2` in `typefly/config/robot_info.json`
+- Verify camera works in other apps
 
 **No response in chat after sending command?**
-- ✓ Check terminal for VLM output
-- ✓ Wait for the plan loop to complete
-- ✓ Verify VLM is receiving images
+- Check terminal for VLM output
+- Wait for the plan loop to complete
+- Verify vLLM is running on port 8000
 
 ## Configuration
 
+### Environment Variables
+
+Set these to customize vLLM connection:
+
+```bash
+export VLLM_URL=http://localhost:8000/v1
+export VLLM_API_KEY=token-abc123
+```
+
+### Robot Modes
+
 Edit `typefly/config/robot_info.json` to change settings:
 
-### Virtual Mode (Default)
+#### Virtual Mode (Default)
 ```json
 {
     "robot_id": "virtual_robot",
@@ -162,7 +183,7 @@ Edit `typefly/config/robot_info.json` to change settings:
 }
 ```
 
-### Tello Drone Mode
+#### Tello Drone Mode
 ```json
 {
     "robot_id": "tello1",
@@ -171,11 +192,42 @@ Edit `typefly/config/robot_info.json` to change settings:
 }
 ```
 
-### Go2 Dog Mode
+#### Go2 Dog Mode
 ```json
 {
     "robot_id": "go21",
     "robot_type": "go2",
     "extra": {}
 }
+```
+
+### Optional Features
+
+```json
+{
+    "robot_id": "virtual_robot",
+    "robot_type": "virtual",
+    "extra": {
+        "capture": 0,
+        "yolo_enabled": false,
+        "scene_image_log": false,
+        "debug_mode": false
+    }
+}
+```
+
+- `yolo_enabled`: Enable YOLO object detection (requires YOLO server on port 50050)
+- `scene_image_log`: Log analyzed images to chat
+- `debug_mode`: Log full VLM responses
+
+## Docker Commands
+
+```bash
+make vllm_start      # Start vLLM container
+make vllm_stop       # Stop vLLM container
+make vllm_restart    # Restart vLLM container
+make vllm_logs       # View vLLM logs
+make vllm_status     # Check vLLM status
+make vllm_test       # Test vLLM endpoint
+make vllm_remove     # Remove vLLM container
 ```
